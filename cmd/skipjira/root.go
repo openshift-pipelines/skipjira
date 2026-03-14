@@ -16,6 +16,7 @@ new branches, then batch-updates Jira tickets via a cron job.`,
 }
 
 func init() {
+	rootCmd.AddCommand(auditCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(queueCmd)
