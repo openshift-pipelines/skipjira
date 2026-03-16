@@ -25,6 +25,7 @@ This will:
 You'll be prompted for:
 - GitHub token
 - Jira URL
+- Jira email
 - Jira token
 - Jira PR custom field ID`,
 	RunE: runInstall,
@@ -92,6 +93,11 @@ func generateConfig(owner, repo string) (*config.Config, error) {
 		return nil, fmt.Errorf("failed to read Jira URL: %w", err)
 	}
 
+	jiraEmail, err := prompt("Jira email", globalCfg.JiraEmail, "user@company.com")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Jira email: %w", err)
+	}
+
 	jiraToken, err := prompt("Jira token", globalCfg.JiraToken, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Jira token: %w", err)
@@ -123,6 +129,7 @@ func generateConfig(owner, repo string) (*config.Config, error) {
 	return &config.Config{
 		GithubToken: githubToken,
 		JiraURL:     jiraURL,
+		JiraEmail:   jiraEmail,
 		JiraToken:   jiraToken,
 		JiraPRField: jiraPRField,
 		RepoOwner:   repoOwner,

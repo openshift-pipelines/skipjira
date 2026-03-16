@@ -25,7 +25,9 @@ func NewClient(jiraURL, email, token, prField string) (*Client, error) {
 		jiraURL:    jiraURL,
 		jiraEmail:  email,
 		jiraToken:  token,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{
+			Transport: &http.Transport{ForceAttemptHTTP2: true},
+		},
 	}, nil
 }
 
@@ -126,6 +128,7 @@ func (c *Client) getIssue(issueKey string) (*Issue, error) {
 
 	req.SetBasicAuth(c.jiraEmail, c.jiraToken)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -174,7 +177,6 @@ func (c *Client) updatePRField(issueKey string, prs []string) error {
 	req.SetBasicAuth(c.jiraEmail, c.jiraToken)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Atlassian-Token", "no-check")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
