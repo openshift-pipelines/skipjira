@@ -68,7 +68,11 @@ func runSync(cmd *cobra.Command, args []string) error {
 		ghClient := github.NewClient(cfg.GithubToken, entry.RepoOwner, entry.RepoName)
 		ctx := context.Background()
 
-		prURL, err := ghClient.GetPRForBranch(ctx, entry.Branch)
+		headOwner := entry.ForkOwner
+		if headOwner == "" {
+			headOwner = entry.RepoOwner
+		}
+		prURL, err := ghClient.GetPRForBranch(ctx, headOwner, entry.Branch)
 		if err != nil {
 			entry.Error = fmt.Sprintf("failed to get PR: %v", err)
 			// Keep in queue - PR might be created later
@@ -93,7 +97,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		})
 
 		// Update Jira tickets
-		jiraClient, err := jira.NewClient(cfg.JiraURL, cfg.JiraToken, cfg.JiraPRField)
+		jiraClient, err := jira.NewClient(cfg.JiraURL, cfg.JiraEmail, cfg.JiraToken, cfg.JiraPRField)
 		if err != nil {
 			entry.Error = fmt.Sprintf("failed to create Jira client: %v", err)
 			fmt.Printf("  ✗ Error: %s\n", entry.Error)

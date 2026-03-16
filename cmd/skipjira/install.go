@@ -36,7 +36,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not a git repository: %w", err)
 	}
 
-	remoteURL, err := git.GetRemoteURL()
+	remoteURL, remoteName, err := git.GetPRTargetRemoteURL()
 	if err != nil {
 		return fmt.Errorf("failed to get remote URL: %w", err)
 	}
@@ -46,7 +46,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse repository from remote URL: %w", err)
 	}
 
-	fmt.Printf("Detected repository: %s/%s\n\n", owner, repo)
+	fmt.Printf("Detected repository: %s/%s (from remote: %s)\n\n", owner, repo, remoteName)
 
 	cfg, err := generateConfig(owner, repo)
 	if err != nil {
@@ -102,13 +102,31 @@ func generateConfig(owner, repo string) (*config.Config, error) {
 		return nil, fmt.Errorf("failed to read Jira PR field: %w", err)
 	}
 
+	fmt.Println("\nConfirm the GitHub repo where PRs are created (e.g. upstream org repo, not your fork):")
+
+	repoOwner, err := prompt("GitHub repo owner", owner, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read repo owner: %w", err)
+	}
+	if repoOwner == "" {
+		repoOwner = owner
+	}
+
+	repoName, err := prompt("GitHub repo name", repo, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read repo name: %w", err)
+	}
+	if repoName == "" {
+		repoName = repo
+	}
+
 	return &config.Config{
 		GithubToken: githubToken,
 		JiraURL:     jiraURL,
 		JiraToken:   jiraToken,
 		JiraPRField: jiraPRField,
-		RepoOwner:   owner,
-		RepoName:    repo,
+		RepoOwner:   repoOwner,
+		RepoName:    repoName,
 	}, nil
 }
 

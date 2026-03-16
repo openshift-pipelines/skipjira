@@ -20,6 +20,10 @@ type Entry struct {
 	Timestamp time.Time `json:"timestamp"`
 	RepoOwner string    `json:"repo_owner"`
 	RepoName  string    `json:"repo_name"`
+	// ForkOwner is the GitHub user who owns the origin remote (the fork).
+	// In a fork workflow this differs from RepoOwner (the upstream org).
+	// Used to build the correct "forkOwner:branch" head filter when looking up PRs.
+	ForkOwner string    `json:"fork_owner,omitempty"`
 	GitRoot   string    `json:"git_root"`
 	PRURL     string    `json:"pr_url,omitempty"`
 	Error     string    `json:"error,omitempty"`

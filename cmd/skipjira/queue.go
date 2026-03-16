@@ -50,6 +50,14 @@ func runQueue(cmd *cobra.Command, args []string) error {
 		jiraIDList[i] = strings.TrimSpace(id)
 	}
 
+	// Determine fork owner from origin remote (may differ from RepoOwner in fork workflows)
+	forkOwner := cfg.RepoOwner
+	if originURL, err := git.GetRemoteURL("origin"); err == nil {
+		if owner, _, err := git.ParseRepoFromURL(originURL); err == nil {
+			forkOwner = owner
+		}
+	}
+
 	// Create queue entry
 	entry := &queue.Entry{
 		Branch:    queueBranch,
@@ -57,6 +65,7 @@ func runQueue(cmd *cobra.Command, args []string) error {
 		Timestamp: time.Now(),
 		RepoOwner: cfg.RepoOwner,
 		RepoName:  cfg.RepoName,
+		ForkOwner: forkOwner,
 		GitRoot:   gitRoot,
 	}
 

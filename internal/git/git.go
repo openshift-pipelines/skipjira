@@ -28,14 +28,28 @@ func GetCurrentBranch() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// GetRemoteURL returns the remote URL for origin
-func GetRemoteURL() (string, error) {
-	cmd := exec.Command("git", "remote", "get-url", "origin")
+// GetRemoteURL returns the remote URL for the named remote
+func GetRemoteURL(name string) (string, error) {
+	cmd := exec.Command("git", "remote", "get-url", name)
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to get remote URL: %w", err)
+		return "", fmt.Errorf("failed to get remote URL for %s: %w", name, err)
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// GetPRTargetRemoteURL returns the URL of the remote where PRs are likely created.
+// It prefers "upstream" (fork workflow) and falls back to "origin".
+// Also returns the remote name that was used.
+func GetPRTargetRemoteURL() (url, remote string, err error) {
+	if upstreamURL, err := GetRemoteURL("upstream"); err == nil {
+		return upstreamURL, "upstream", nil
+	}
+	originURL, err := GetRemoteURL("origin")
+	if err != nil {
+		return "", "", err
+	}
+	return originURL, "origin", nil
 }
 
 // ExtractJiraIDs extracts Jira ticket IDs from a branch name

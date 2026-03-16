@@ -28,12 +28,14 @@ func NewClient(token, owner, repo string) *Client {
 	}
 }
 
-// GetPRForBranch finds the PR URL for a given branch
-func (c *Client) GetPRForBranch(ctx context.Context, branchName string) (string, error) {
+// GetPRForBranch finds the PR URL for a given branch.
+// headOwner is the GitHub user who owns the branch (the fork user in fork workflows,
+// or the same as the repo owner in non-fork workflows).
+func (c *Client) GetPRForBranch(ctx context.Context, headOwner, branchName string) (string, error) {
 	// List PRs for the branch
 	opts := &github.PullRequestListOptions{
 		State: "all",
-		Head:  fmt.Sprintf("%s:%s", c.owner, branchName),
+		Head:  fmt.Sprintf("%s:%s", headOwner, branchName),
 		ListOptions: github.ListOptions{
 			PerPage: 10,
 		},
