@@ -10,18 +10,20 @@ import (
 
 // Config represents repository configuration
 type Config struct {
-	GithubToken  string `yaml:"github_token,omitempty"`
-	JiraURL      string `yaml:"jira_url,omitempty"`
-	JiraToken    string `yaml:"jira_token,omitempty"`
-	JiraPRField  string `yaml:"jira_pr_field,omitempty"`
-	RepoOwner    string `yaml:"repo_owner"`
-	RepoName     string `yaml:"repo_name"`
+	GithubToken string `yaml:"github_token,omitempty"`
+	JiraURL     string `yaml:"jira_url,omitempty"`
+	JiraEmail   string `yaml:"jira_email,omitempty"`
+	JiraToken   string `yaml:"jira_token,omitempty"`
+	JiraPRField string `yaml:"jira_pr_field,omitempty"`
+	RepoOwner   string `yaml:"repo_owner"`
+	RepoName    string `yaml:"repo_name"`
 }
 
 // GlobalConfig represents global configuration (shared across repos)
 type GlobalConfig struct {
 	GithubToken string `yaml:"github_token,omitempty"`
 	JiraURL     string `yaml:"jira_url,omitempty"`
+	JiraEmail   string `yaml:"jira_email,omitempty"`
 	JiraToken   string `yaml:"jira_token,omitempty"`
 	JiraPRField string `yaml:"jira_pr_field,omitempty"`
 }
@@ -33,7 +35,7 @@ func GetGlobalConfigPath() (string, error) {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	configDir := filepath.Join(home, ".skipjira")
+	configDir := filepath.Join(home, ".config", "skipjira")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create config directory: %w", err)
 	}
@@ -41,7 +43,6 @@ func GetGlobalConfigPath() (string, error) {
 	return filepath.Join(configDir, "config.yaml"), nil
 }
 
-// LoadGlobal reads global config from ~/.skipjira/config.yaml
 func LoadGlobal() (*GlobalConfig, error) {
 	configPath, err := GetGlobalConfigPath()
 	if err != nil {
@@ -65,7 +66,6 @@ func LoadGlobal() (*GlobalConfig, error) {
 	return &cfg, nil
 }
 
-// SaveGlobal writes global config to ~/.skipjira/config.yaml
 func SaveGlobal(cfg *GlobalConfig) error {
 	configPath, err := GetGlobalConfigPath()
 	if err != nil {
@@ -112,6 +112,9 @@ func Load(gitRoot string) (*Config, error) {
 	if cfg.JiraURL == "" {
 		cfg.JiraURL = globalCfg.JiraURL
 	}
+	if cfg.JiraEmail == "" {
+		cfg.JiraEmail = globalCfg.JiraEmail
+	}
 	if cfg.JiraToken == "" {
 		cfg.JiraToken = globalCfg.JiraToken
 	}
@@ -125,6 +128,9 @@ func Load(gitRoot string) (*Config, error) {
 	}
 	if cfg.JiraURL == "" {
 		return nil, fmt.Errorf("jira_url is required (set in global or local config)")
+	}
+	if cfg.JiraEmail == "" {
+		return nil, fmt.Errorf("jira_email is required (set in global or local config)")
 	}
 	if cfg.JiraToken == "" {
 		return nil, fmt.Errorf("jira_token is required (set in global or local config)")
@@ -161,12 +167,12 @@ func Save(gitRoot string, cfg *Config) error {
 // CreateTemplate creates a config template with empty values
 func CreateTemplate(gitRoot string) error {
 	cfg := &Config{
-		GithubToken:  "",
-		JiraURL:      "",
-		JiraToken:    "",
-		JiraPRField:  "",
-		RepoOwner:    "",
-		RepoName:     "",
+		GithubToken: "",
+		JiraURL:     "",
+		JiraToken:   "",
+		JiraPRField: "",
+		RepoOwner:   "",
+		RepoName:    "",
 	}
 	return Save(gitRoot, cfg)
 }

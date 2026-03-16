@@ -33,12 +33,13 @@ skipjira config
 You'll be prompted for:
 - **GitHub token** (with repo access)
 - **Jira URL** (e.g., `https://issues.company.com`) - Must support Jira v3 API
+- **Jira email** (the email address associated with your Jira API token)
 - **Jira token** (API token)
 - **Jira PR field** (e.g., `customfield_12310220`)
 
 These settings are saved to `~/.config/skipjira/config.yaml` and reused across all repositories.
 
-**Note:** SkipJira uses the Jira REST API v3.
+**Note:** SkipJira uses the Jira REST API v3 with basic auth (`email:token`).
 
 ### 3. Install Pre-Push Hook
 
@@ -50,6 +51,8 @@ skipjira install
 ```
 
 This installs the pre-push hook to `.git/hooks/pre-push` and creates repo-specific config.
+
+During install, skipjira auto-detects the target repository for PR lookups. It prefers the `upstream` remote (fork workflow) and falls back to `origin`. You'll be prompted to confirm or override the detected owner and repo name — useful if PRs are created against an upstream org repo rather than your fork.
 
 ### 4. Setup Cron Job
 
@@ -106,6 +109,7 @@ Jira ticket ID [PROJ-123] (or 'skip' to skip):
 ```yaml
 github_token: ghp_xxxxx
 jira_url: https://issues.company.com
+jira_email: user@company.com
 jira_token: xxxxx
 jira_pr_field: customfield_12345678
 ```
@@ -113,7 +117,7 @@ jira_pr_field: customfield_12345678
 ### Per-Repository (`.git/skipjira-config.yaml`)
 
 ```yaml
-repo_owner: theakshaypant
-repo_name: skipjira
+repo_owner: org-name        # upstream org where PRs are created
+repo_name: repo-name
 # Optional: override global tokens/URLs if needed
 ```

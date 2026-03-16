@@ -62,6 +62,21 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		globalCfg.JiraURL = input
 	}
 
+	// Jira email
+	if globalCfg.JiraEmail != "" {
+		fmt.Printf("Jira email [current: %s]: ", globalCfg.JiraEmail)
+	} else {
+		fmt.Print("Jira email (e.g., user@company.com): ")
+	}
+	input, err = reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read Jira email: %w", err)
+	}
+	input = strings.TrimSpace(input)
+	if input != "" {
+		globalCfg.JiraEmail = input
+	}
+
 	// Jira token
 	if globalCfg.JiraToken != "" {
 		fmt.Printf("Jira token [current: %s...]: ", globalCfg.JiraToken[:10])
