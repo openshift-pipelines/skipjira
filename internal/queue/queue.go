@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/theakshaypant/skipjira/internal/audit"
+	"github.com/openshift-pipelines/skipjira/internal/audit"
 )
 
 // Entry represents a pending or failed PR-to-Jira link operation
@@ -23,10 +23,10 @@ type Entry struct {
 	// ForkOwner is the GitHub user who owns the origin remote (the fork).
 	// In a fork workflow this differs from RepoOwner (the upstream org).
 	// Used to build the correct "forkOwner:branch" head filter when looking up PRs.
-	ForkOwner string    `json:"fork_owner,omitempty"`
-	GitRoot   string    `json:"git_root"`
-	PRURL     string    `json:"pr_url,omitempty"`
-	Error     string    `json:"error,omitempty"`
+	ForkOwner string `json:"fork_owner,omitempty"`
+	GitRoot   string `json:"git_root"`
+	PRURL     string `json:"pr_url,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 var mu sync.Mutex
@@ -138,4 +138,3 @@ func WriteAll(entries []Entry) error {
 
 	return nil
 }
-

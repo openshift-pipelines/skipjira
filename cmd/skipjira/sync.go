@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/openshift-pipelines/skipjira/internal/audit"
+	"github.com/openshift-pipelines/skipjira/internal/config"
+	"github.com/openshift-pipelines/skipjira/internal/github"
+	"github.com/openshift-pipelines/skipjira/internal/jira"
+	"github.com/openshift-pipelines/skipjira/internal/queue"
 	"github.com/spf13/cobra"
-	"github.com/theakshaypant/skipjira/internal/audit"
-	"github.com/theakshaypant/skipjira/internal/config"
-	"github.com/theakshaypant/skipjira/internal/github"
-	"github.com/theakshaypant/skipjira/internal/jira"
-	"github.com/theakshaypant/skipjira/internal/queue"
 )
 
 var syncCmd = &cobra.Command{

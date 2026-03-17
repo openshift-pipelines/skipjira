@@ -3,8 +3,8 @@ package jirasync
 import (
 	"strings"
 
-	"github.com/theakshaypant/skipjira/internal/github"
-	"github.com/theakshaypant/skipjira/internal/jira"
+	"github.com/openshift-pipelines/skipjira/internal/github"
+	"github.com/openshift-pipelines/skipjira/internal/jira"
 )
 
 // PRStateToJiraStatus maps PR states to desired Jira status

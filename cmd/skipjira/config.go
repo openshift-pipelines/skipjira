@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/openshift-pipelines/skipjira/internal/config"
 	"github.com/spf13/cobra"
-	"github.com/theakshaypant/skipjira/internal/config"
 )
 
 var configCmd = &cobra.Command{

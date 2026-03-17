@@ -19,7 +19,7 @@ Automatically link GitHub Pull Requests to Jira tickets without slowing down you
 ### 1. Install Binary
 
 ```bash
-go install github.com/theakshaypant/skipjira/cmd/skipjira@latest
+go install github.com/openshift-pipelines/skipjira/cmd/skipjira@latest
 ```
 
 This installs `skipjira` to `$GOPATH/bin` (usually `~/go/bin`). Make sure it's in your `$PATH`.

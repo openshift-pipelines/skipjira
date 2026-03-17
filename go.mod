@@ -1,4 +1,4 @@
-module github.com/theakshaypant/skipjira
+module github.com/openshift-pipelines/skipjira
 
 go 1.25.5
 

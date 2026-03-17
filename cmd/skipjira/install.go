@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/openshift-pipelines/skipjira/internal/config"
+	"github.com/openshift-pipelines/skipjira/internal/git"
+	"github.com/openshift-pipelines/skipjira/scripts"
 	"github.com/spf13/cobra"
-	"github.com/theakshaypant/skipjira/internal/config"
-	"github.com/theakshaypant/skipjira/internal/git"
-	"github.com/theakshaypant/skipjira/scripts"
 )
 
 var installCmd = &cobra.Command{

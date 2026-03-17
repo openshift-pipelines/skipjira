@@ -6,21 +6,21 @@ import (
 	"os"
 	"time"
 
+	"github.com/openshift-pipelines/skipjira/internal/jirasync"
+	"github.com/openshift-pipelines/skipjira/internal/slack"
 	"github.com/spf13/cobra"
-	"github.com/theakshaypant/skipjira/internal/jirasync"
-	"github.com/theakshaypant/skipjira/internal/slack"
 )
 
 var (
 	// CLI flags
-	configFile    string
-	githubToken   string
-	jiraURL       string
-	jiraEmail     string
-	jiraToken     string
-	jiraPRField   string
-	since         string
-	slackWebhook  string
+	configFile   string
+	githubToken  string
+	jiraURL      string
+	jiraEmail    string
+	jiraToken    string
+	jiraPRField  string
+	since        string
+	slackWebhook string
 )
 
 var rootCmd = &cobra.Command{

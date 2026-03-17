@@ -3,7 +3,7 @@ package jirasync
 import (
 	"fmt"
 
-	"github.com/theakshaypant/skipjira/internal/jira"
+	"github.com/openshift-pipelines/skipjira/internal/jira"
 )
 
 // FindTransitionSequence attempts to find a sequence of transitions to reach target
@@ -78,10 +78,10 @@ func TryMultiStepTransition(jiraClient *jira.Client, issueKey, currentStatus, ta
 		// No direct path - try progressing through workflow states
 		// Common workflow progression: To Do → In Progress → Code Review → On QA → Closed
 		preferredIntermediates := []string{
-			"In Progress",   // From To Do
-			"Code Review",   // From In Progress
-			"Open",          // Alternative to In Progress
-			"Review",        // Alternative naming
+			"In Progress", // From To Do
+			"Code Review", // From In Progress
+			"Open",        // Alternative to In Progress
+			"Review",      // Alternative naming
 		}
 
 		var intermediateTransition *jira.Transition

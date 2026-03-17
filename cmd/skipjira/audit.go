@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/openshift-pipelines/skipjira/internal/audit"
 	"github.com/spf13/cobra"
-	"github.com/theakshaypant/skipjira/internal/audit"
 )
 
 var (

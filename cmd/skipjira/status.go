@@ -3,14 +3,14 @@ package main
 import (
 	"fmt"
 
+	"github.com/openshift-pipelines/skipjira/internal/queue"
 	"github.com/spf13/cobra"
-	"github.com/theakshaypant/skipjira/internal/queue"
 )
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show queue status",
-	Long:  `Display the current status of the queue (pending and failed entries only).
+	Long: `Display the current status of the queue (pending and failed entries only).
 
 Successfully processed entries are removed from the queue and logged in the audit log.`,
 	RunE: runStatus,

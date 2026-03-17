@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/theakshaypant/skipjira/internal/github"
-	"github.com/theakshaypant/skipjira/internal/jira"
-	"github.com/theakshaypant/skipjira/internal/jirasync"
-	"github.com/theakshaypant/skipjira/internal/slack"
+	"github.com/openshift-pipelines/skipjira/internal/github"
+	"github.com/openshift-pipelines/skipjira/internal/jira"
+	"github.com/openshift-pipelines/skipjira/internal/jirasync"
+	"github.com/openshift-pipelines/skipjira/internal/slack"
 )
 
 func main() {
