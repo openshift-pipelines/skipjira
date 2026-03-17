@@ -4,7 +4,6 @@
 # Copy this file to jirasync-repos.yaml and customize for your organization.
 
 repositories:
-repositories:
   - owner: tektoncd
     name: results
   - owner: tektoncd
