@@ -1,0 +1,28 @@
+# JiraSync Repository Configuration
+#
+# This file defines which GitHub repositories jirasync should monitor.
+# Copy this file to jirasync-repos.yaml and customize for your organization.
+
+repositories:
+  - owner: tektoncd
+    name: results
+  - owner: tektoncd
+    name: operator
+  - owner: tektoncd
+    name: pruner
+  - owner: tektoncd
+    name: pipelines-as-code
+  - owner: tektoncd
+    name: plumbing
+  - owner: tektoncd
+    name: pipeline
+  - owner: tektoncd
+    name: cli
+  - owner: tektoncd
+    name: chains
+  - owner: tektoncd
+    name: triggers
+  - owner: tektoncd
+    name: catalog
+  - owner: tektoncd
+    name: hub
