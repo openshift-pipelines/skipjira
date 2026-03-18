@@ -53,3 +53,43 @@ func (c *Client) GetPRForBranch(ctx context.Context, headOwner, branchName strin
 	// Return the first (most recent) PR
 	return prs[0].GetHTMLURL(), nil
 }
+
+// GetPRByNumber retrieves a pull request by its number
+func (c *Client) GetPRByNumber(ctx context.Context, prNumber int) (*github.PullRequest, error) {
+	pr, _, err := c.client.PullRequests.Get(ctx, c.owner, c.repo, prNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PR #%d: %w", prNumber, err)
+	}
+	return pr, nil
+}
+
+// GetPRDiff retrieves the diff/patch content for a pull request
+func (c *Client) GetPRDiff(ctx context.Context, prNumber int) (string, error) {
+	// Get PR in diff format
+	diff, _, err := c.client.PullRequests.GetRaw(ctx, c.owner, c.repo, prNumber, github.RawOptions{Type: github.Diff})
+	if err != nil {
+		return "", fmt.Errorf("failed to get diff for PR #%d: %w", prNumber, err)
+	}
+	return diff, nil
+}
+
+// GetPRCommits retrieves all commits for a pull request
+func (c *Client) GetPRCommits(ctx context.Context, prNumber int) ([]*github.RepositoryCommit, error) {
+	opts := &github.ListOptions{PerPage: 100}
+	var allCommits []*github.RepositoryCommit
+
+	for {
+		commits, resp, err := c.client.PullRequests.ListCommits(ctx, c.owner, c.repo, prNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list commits for PR #%d: %w", prNumber, err)
+		}
+		allCommits = append(allCommits, commits...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return allCommits, nil
+}
