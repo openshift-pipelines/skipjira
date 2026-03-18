@@ -33,6 +33,16 @@ func NewClient(apiKey string, model string) (*Client, error) {
 
 // GenerateReleaseNote uses Gemini to generate a release note based on PR context
 func (c *Client) GenerateReleaseNote(ctx context.Context, prContext PRContext) (string, error) {
+	// Build the prompt
+	prompt := buildReleaseNotePrompt(prContext)
+
+	// Use the generic GenerateContent method
+	return c.GenerateContent(ctx, prompt)
+}
+
+// GenerateContent uses Gemini to generate text based on a prompt
+// This is a generic method used by various features (release notes, PR kind, etc.)
+func (c *Client) GenerateContent(ctx context.Context, prompt string) (string, error) {
 	// Create Gemini client
 	client, err := genai.NewClient(ctx, option.WithAPIKey(c.apiKey))
 	if err != nil {
@@ -42,9 +52,6 @@ func (c *Client) GenerateReleaseNote(ctx context.Context, prContext PRContext) (
 
 	// Get the model
 	model := client.GenerativeModel(c.model)
-
-	// Build the prompt
-	prompt := buildReleaseNotePrompt(prContext)
 
 	// Generate content
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))

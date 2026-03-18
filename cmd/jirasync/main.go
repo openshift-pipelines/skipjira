@@ -6,24 +6,26 @@ import (
 	"os"
 	"time"
 
+	"github.com/openshift-pipelines/skipjira/internal/jirasync"
+	"github.com/openshift-pipelines/skipjira/internal/slack"
 	"github.com/spf13/cobra"
-	"github.com/theakshaypant/skipjira/internal/jirasync"
-	"github.com/theakshaypant/skipjira/internal/slack"
 )
 
 var (
 	// CLI flags
-	configFile            string
-	githubToken           string
-	jiraURL               string
-	jiraEmail             string
-	jiraToken             string
-	jiraPRField           string
-	jiraReleaseNotesField string
-	geminiAPIKey          string
-	geminiModel           string
-	since                 string
-	slackWebhook          string
+	configFile                  string
+	githubToken                 string
+	jiraURL                     string
+	jiraEmail                   string
+	jiraToken                   string
+	jiraPRField                 string
+	jiraReleaseNotesTextField   string
+	jiraReleaseNotesTypeField   string
+	jiraReleaseNotesStatusField string
+	geminiAPIKey                string
+	geminiModel                 string
+	since                       string
+	slackWebhook                string
 )
 
 var rootCmd = &cobra.Command{
@@ -50,7 +52,9 @@ func init() {
 	rootCmd.Flags().StringVar(&jiraEmail, "jira-email", "", "Jira email for authentication (required)")
 	rootCmd.Flags().StringVar(&jiraToken, "jira-token", "", "Jira API token (required)")
 	rootCmd.Flags().StringVar(&jiraPRField, "jira-pr-field", "", "Jira custom field ID for PR links (required)")
-	rootCmd.Flags().StringVar(&jiraReleaseNotesField, "jira-release-notes-field", "customfield_12317313", "Jira custom field ID for release notes (optional)")
+	rootCmd.Flags().StringVar(&jiraReleaseNotesTextField, "jira-release-notes-text-field", "", "Jira custom field ID for release notes text (e.g., customfield_10783)")
+	rootCmd.Flags().StringVar(&jiraReleaseNotesTypeField, "jira-release-notes-type-field", "", "Jira custom field ID for release notes type (e.g., customfield_10785)")
+	rootCmd.Flags().StringVar(&jiraReleaseNotesStatusField, "jira-release-notes-status-field", "", "Jira custom field ID for release notes status (e.g., customfield_10807)")
 	rootCmd.Flags().StringVar(&geminiAPIKey, "gemini-api-key", "", "Google Gemini API key for release notes generation (optional)")
 	rootCmd.Flags().StringVar(&geminiModel, "gemini-model", "", "Gemini model to use (optional, defaults to gemini-3-flash-preview)")
 	rootCmd.Flags().StringVar(&since, "since", "", "Only process PRs updated since this date (format: 2006-01-02 or DD/MM/YYYY). Defaults to yesterday if not provided.")
@@ -95,7 +99,9 @@ func runSync(cmd *cobra.Command, args []string) error {
 		jiraEmail,
 		jiraToken,
 		jiraPRField,
-		jiraReleaseNotesField,
+		jiraReleaseNotesTextField,
+		jiraReleaseNotesTypeField,
+		jiraReleaseNotesStatusField,
 		geminiAPIKey,
 		geminiModel,
 		sinceTime,

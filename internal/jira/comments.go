@@ -57,11 +57,11 @@ func (c *Client) AddComment(issueKey string, comment string) error {
 }
 
 // AddReleaseNotesComment adds a highlighted AI-generated release notes comment with assignee mention
-func (c *Client) AddReleaseNotesComment(issueKey, releaseNotes, releaseNotesType, releaseNotesStatus, assigneeAccountId string) error {
+func (c *Client) AddReleaseNotesComment(issueKey, releaseNotes, prKind, releaseNotesStatus, assigneeAccountId string) error {
 	url := c.apiURL(fmt.Sprintf("/rest/api/3/issue/%s/comment", issueKey))
 
 	// Build ADF document for the comment with panel and mention
-	adfComment := buildCommentADF(releaseNotes, releaseNotesType, releaseNotesStatus, assigneeAccountId)
+	adfComment := buildCommentADF(releaseNotes, prKind, releaseNotesStatus, assigneeAccountId)
 
 	// Create request payload
 	payload := map[string]interface{}{
@@ -91,10 +91,121 @@ func (c *Client) AddReleaseNotesComment(issueKey, releaseNotes, releaseNotesType
 	return nil
 }
 
+// AddFieldUpdateComment adds a notification comment when release notes fields are updated
+func (c *Client) AddFieldUpdateComment(issueKey, releaseNotes, prKind, status string) error {
+	url := c.apiURL(fmt.Sprintf("/rest/api/3/issue/%s/comment", issueKey))
+
+	// Build ADF document for field update notification
+	adfComment := buildFieldUpdateADF(releaseNotes, prKind, status)
+
+	// Create request payload
+	payload := map[string]interface{}{
+		"body": adfComment,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal comment payload: %w", err)
+	}
+
+	req, err := c.newRequest(http.MethodPost, url, bytes.NewReader(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to add comment: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if err := c.checkResponse(resp, http.StatusCreated); err != nil {
+		return fmt.Errorf("failed to add comment: %w", err)
+	}
+
+	return nil
+}
+
+// buildFieldUpdateADF creates an ADF document for field update notification
+func buildFieldUpdateADF(releaseNotes, prKind, status string) adfNode {
+	// Blue info panel for field update notification
+	attrs := map[string]interface{}{
+		"panelType": "info",
+	}
+
+	metadataParagraph := adfNode{
+		Type: "paragraph",
+		Content: []adfNode{
+			{
+				Type: "text",
+				Text: "PR Kind: ",
+				Marks: []map[string]interface{}{
+					{"type": "strong"},
+				},
+			},
+			{
+				Type: "text",
+				Text: prKind + " | ",
+			},
+			{
+				Type: "text",
+				Text: "Status: ",
+				Marks: []map[string]interface{}{
+					{"type": "strong"},
+				},
+			},
+			{
+				Type: "text",
+				Text: status,
+			},
+		},
+	}
+
+	footerParagraph := adfNode{
+		Type: "paragraph",
+		Content: []adfNode{
+			{
+				Type: "text",
+				Text: "Fields updated from PR description",
+				Marks: []map[string]interface{}{
+					{"type": "em"},
+				},
+			},
+		},
+	}
+
+	return adfNode{
+		Version: 1,
+		Type:    "doc",
+		Content: []adfNode{
+			{
+				Type:  "panel",
+				Attrs: attrs,
+				Content: []adfNode{
+					{
+						Type: "paragraph",
+						Content: []adfNode{
+							{
+								Type: "text",
+								Text: "📝 Release Notes Updated",
+								Marks: []map[string]interface{}{
+									{"type": "strong"},
+								},
+							},
+						},
+					},
+					metadataParagraph,
+					footerParagraph,
+				},
+			},
+		},
+	}
+}
+
 // buildCommentADF creates an ADF document for a release notes comment
 // If assigneeAccountId is provided, creates an attention-grabbing panel with mention (AI-generated)
 // Otherwise, creates a simple panel for extracted release notes
-func buildCommentADF(comment string, releaseNotesType string, releaseNotesStatus string, assigneeAccountId string) adfNode {
+func buildCommentADF(comment string, prKind string, releaseNotesStatus string, assigneeAccountId string) adfNode {
 	if assigneeAccountId == "" {
 		// Simple info panel for extracted release notes (no assignee mention)
 		attrs := map[string]interface{}{
@@ -116,14 +227,14 @@ func buildCommentADF(comment string, releaseNotesType string, releaseNotesStatus
 			Content: []adfNode{
 				{
 					Type: "text",
-					Text: "Type: ",
+					Text: "PR Kind: ",
 					Marks: []map[string]interface{}{
 						{"type": "strong"},
 					},
 				},
 				{
 					Type: "text",
-					Text: releaseNotesType + " | ",
+					Text: prKind + " | ",
 				},
 				{
 					Type: "text",
@@ -212,20 +323,20 @@ func buildCommentADF(comment string, releaseNotesType string, releaseNotesStatus
 		},
 	}
 
-	// Add type and status metadata
+	// Add PR kind and status metadata
 	metadataParagraph := adfNode{
 		Type: "paragraph",
 		Content: []adfNode{
 			{
 				Type: "text",
-				Text: "Type: ",
+				Text: "PR Kind: ",
 				Marks: []map[string]interface{}{
 					{"type": "strong"},
 				},
 			},
 			{
 				Type: "text",
-				Text: releaseNotesType + " | ",
+				Text: prKind + " | ",
 			},
 			{
 				Type: "text",

@@ -93,3 +93,12 @@ func (c *Client) GetPRCommits(ctx context.Context, prNumber int) ([]*github.Repo
 
 	return allCommits, nil
 }
+
+// GetPRLabels returns the labels for a pull request
+// This is a simple wrapper that handles nil checks
+func GetPRLabels(pr *github.PullRequest) []*github.Label {
+	if pr == nil {
+		return nil
+	}
+	return pr.Labels
+}

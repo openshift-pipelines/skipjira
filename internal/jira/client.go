@@ -9,22 +9,26 @@ import (
 
 // Client wraps Jira API client
 type Client struct {
-	prField           string
-	releaseNotesField string
-	jiraURL           string
-	jiraEmail         string
-	jiraToken         string
-	httpClient        *http.Client
+	prField                   string
+	releaseNotesTextField     string
+	releaseNotesTypeField     string
+	releaseNotesStatusField   string
+	jiraURL                   string
+	jiraEmail                 string
+	jiraToken                 string
+	httpClient                *http.Client
 }
 
 // NewClient creates a new Jira client
-func NewClient(jiraURL, email, token, prField, releaseNotesField string) (*Client, error) {
+func NewClient(jiraURL, email, token, prField, releaseNotesTextField, releaseNotesTypeField, releaseNotesStatusField string) (*Client, error) {
 	return &Client{
-		prField:           prField,
-		releaseNotesField: releaseNotesField,
-		jiraURL:           strings.TrimRight(jiraURL, "/"), // Normalize URL once
-		jiraEmail:         email,
-		jiraToken:         token,
+		prField:                 prField,
+		releaseNotesTextField:   releaseNotesTextField,
+		releaseNotesTypeField:   releaseNotesTypeField,
+		releaseNotesStatusField: releaseNotesStatusField,
+		jiraURL:                 strings.TrimRight(jiraURL, "/"), // Normalize URL once
+		jiraEmail:               email,
+		jiraToken:               token,
 		httpClient: &http.Client{
 			Transport: &http.Transport{ForceAttemptHTTP2: true},
 		},
