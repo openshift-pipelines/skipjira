@@ -89,7 +89,7 @@ func main() {
 	}
 
 	// Test with PRs from last 7 days
-	sinceTime := time.Now().AddDate(0, 0, -7)
+	sinceTime := time.Now().AddDate(0, 0, -6)
 
 	fmt.Printf("Testing jirasync flow for %d repository(ies)\n", len(repos))
 	fmt.Printf("Fetching PRs updated since %s\n\n", sinceTime.Format("2006-01-02"))
