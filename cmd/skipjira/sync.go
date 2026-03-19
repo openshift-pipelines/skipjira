@@ -97,7 +97,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		})
 
 		// Update Jira tickets
-		jiraClient, err := jira.NewClient(cfg.JiraURL, cfg.JiraEmail, cfg.JiraToken, cfg.JiraPRField)
+		jiraClient, err := jira.NewClient(cfg.JiraURL, cfg.JiraEmail, cfg.JiraToken, cfg.JiraPRField, "", "", "")
 		if err != nil {
 			entry.Error = fmt.Sprintf("failed to create Jira client: %v", err)
 			fmt.Printf("  ✗ Error: %s\n", entry.Error)

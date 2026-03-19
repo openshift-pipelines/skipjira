@@ -8,10 +8,12 @@ import (
 // adfNode represents a node in Atlassian Document Format.
 // Field order matches Jira's expected ADF serialization (version before type).
 type adfNode struct {
-	Version int       `json:"version,omitempty"`
-	Type    string    `json:"type"`
-	Content []adfNode `json:"content,omitempty"`
-	Text    string    `json:"text,omitempty"`
+	Version int                    `json:"version,omitempty"`
+	Type    string                 `json:"type"`
+	Attrs   map[string]interface{} `json:"attrs,omitempty"`
+	Content []adfNode              `json:"content,omitempty"`
+	Text    string                 `json:"text,omitempty"`
+	Marks   []map[string]interface{} `json:"marks,omitempty"`
 }
 
 // adfDoc builds an ADF document with all URLs as a single comma-separated text node.

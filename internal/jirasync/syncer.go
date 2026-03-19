@@ -8,17 +8,24 @@ import (
 	"github.com/openshift-pipelines/skipjira/internal/github"
 	"github.com/openshift-pipelines/skipjira/internal/jira"
 	"github.com/openshift-pipelines/skipjira/internal/slack"
+	gogithub "github.com/google/go-github/v81/github"
+	"github.com/openshift-pipelines/skipjira/internal/gemini"
+	"github.com/openshift-pipelines/skipjira/internal/releasenotes"
 )
 
 // Syncer coordinates PR to Jira ticket synchronization
 type Syncer struct {
-	githubToken string
-	jiraURL     string
-	jiraEmail   string
-	jiraToken   string
-	jiraPRField string
-	jiraClient  *jira.Client
-	sinceTime   time.Time
+	githubToken                string
+	jiraURL                    string
+	jiraEmail                  string
+	jiraToken                  string
+	jiraPRField                string
+	jiraReleaseNotesTextField  string
+	jiraReleaseNotesTypeField  string
+	jiraReleaseNotesStatusField string
+	jiraClient                 *jira.Client
+	geminiClient               *gemini.Client
+	sinceTime                  time.Time
 }
 
 // SyncResult contains the results of syncing a repository
@@ -38,20 +45,32 @@ type SyncSummary struct {
 }
 
 // NewSyncer creates a new syncer instance
-func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField string, sinceTime time.Time) (*Syncer, error) {
-	jiraClient, err := jira.NewClient(jiraURL, jiraEmail, jiraToken, jiraPRField)
+func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField, geminiAPIKey, geminiModel string, sinceTime time.Time) (*Syncer, error) {
+	jiraClient, err := jira.NewClient(jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira client: %w", err)
 	}
 
+	var geminiClient *gemini.Client
+	if geminiAPIKey != "" {
+		geminiClient, err = gemini.NewClient(geminiAPIKey, geminiModel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+		}
+	}
+
 	return &Syncer{
-		githubToken: githubToken,
-		jiraURL:     jiraURL,
-		jiraEmail:   jiraEmail,
-		jiraToken:   jiraToken,
-		jiraPRField: jiraPRField,
-		jiraClient:  jiraClient,
-		sinceTime:   sinceTime,
+		githubToken:                githubToken,
+		jiraURL:                    jiraURL,
+		jiraEmail:                  jiraEmail,
+		jiraToken:                  jiraToken,
+		jiraPRField:                jiraPRField,
+		jiraReleaseNotesTextField:  jiraReleaseNotesTextField,
+		jiraReleaseNotesTypeField:  jiraReleaseNotesTypeField,
+		jiraReleaseNotesStatusField: jiraReleaseNotesStatusField,
+		jiraClient:                 jiraClient,
+		geminiClient:               geminiClient,
+		sinceTime:                  sinceTime,
 	}, nil
 }
 
@@ -125,6 +144,11 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 				unlinkedPRs++
 				results[repoIdx].PRsProcessed++
 				continue
+			}
+
+			// Add release notes to Jira tickets (if Gemini client is configured)
+			if s.geminiClient != nil {
+				s.addReleaseNotes(ctx, pr, issues, ghClient)
 			}
 
 			// Add this PR to global ticket mapping and store ticket metadata
@@ -335,4 +359,72 @@ func formatSteps(steps []string) string {
 		result += fmt.Sprintf("'%s'", step)
 	}
 	return result
+}
+
+// addReleaseNotes extracts or generates release notes and adds them to Jira tickets
+// If extracted from PR description: updates Jira release notes fields directly
+// If AI-generated: adds a highlighted comment with assignee mention
+func (s *Syncer) addReleaseNotes(ctx context.Context, pr *gogithub.PullRequest, issues []jira.SearchIssue, ghClient *github.Client) {
+	// Extract or generate release notes
+	result, err := releasenotes.GetOrGenerate(ctx, pr, ghClient, s.geminiClient)
+	if err != nil {
+		fmt.Printf("  ⚠ PR #%d: Failed to get release notes: %v\n", pr.GetNumber(), err)
+		return
+	}
+
+	// Process each linked Jira ticket
+	releaseNotesStatus := "Proposed"
+
+	for _, issue := range issues {
+		if result.IsGenerated {
+			// AI-generated: Add orange warning panel with assignee mention
+			// Get assignee account ID
+			fullIssue, err := s.jiraClient.GetIssueWithFields(issue.Key, []string{"assignee"})
+			if err != nil {
+				fmt.Printf("  ⚠ PR #%d: Failed to get assignee for %s: %v\n", pr.GetNumber(), issue.Key, err)
+				// Fall back to comment without mention
+				if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, ""); err != nil {
+					fmt.Printf("  ⚠ PR #%d: Failed to add comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+				} else {
+					fmt.Printf("  ✓ PR #%d: Added AI-generated release notes comment to %s\n", pr.GetNumber(), issue.Key)
+				}
+				continue
+			}
+
+			// Extract assignee account ID
+			assigneeId := ""
+			if assignee, ok := fullIssue.Fields["assignee"].(map[string]interface{}); ok {
+				if accountId, ok := assignee["accountId"].(string); ok {
+					assigneeId = accountId
+				}
+			}
+
+			// Add comment with mention, PR kind, and status
+			if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, assigneeId); err != nil {
+				fmt.Printf("  ⚠ PR #%d: Failed to add comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+			} else {
+				fmt.Printf("  ✓ PR #%d: Added AI-generated release notes comment to %s (PR Kind: %s)\n", pr.GetNumber(), issue.Key, result.Kind)
+			}
+		} else {
+			// Extracted from PR: Try to update fields first
+			updated, err := s.jiraClient.UpdateReleaseNotesFields(issue.Key, result.Notes, result.Kind, releaseNotesStatus)
+			if err != nil {
+				// Field update failed - fall back to comment-only approach
+				fmt.Printf("  ⚠ PR #%d: Failed to update fields for %s, using comment: %v\n", pr.GetNumber(), issue.Key, err)
+				if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, ""); err != nil {
+					fmt.Printf("  ⚠ PR #%d: Failed to add comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+				} else {
+					fmt.Printf("  ✓ PR #%d: Added release notes comment to %s (PR Kind: %s, field update failed)\n", pr.GetNumber(), issue.Key, result.Kind)
+				}
+			} else if updated {
+				// Field update succeeded - add notification comment
+				if err := s.jiraClient.AddFieldUpdateComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus); err != nil {
+					fmt.Printf("  ⚠ PR #%d: Failed to add notification comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+				} else {
+					fmt.Printf("  ✓ PR #%d: Updated fields and added notification to %s (PR Kind: %s)\n", pr.GetNumber(), issue.Key, result.Kind)
+				}
+			}
+			// If updated is false and err is nil: fields already populated, no message printed
+		}
+	}
 }

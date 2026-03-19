@@ -98,12 +98,12 @@ func main() {
 
 	// Step 3: Connect to Jira
 	fmt.Println("=== Step 1: Connecting to Jira ===")
-	jiraClient, err := jira.NewClient(jiraURL, jiraEmail, jiraToken, jiraPRField)
+	jiraClient, err := jira.NewClient(jiraURL, jiraEmail, jiraToken, jiraPRField, "", "", "")
 	if err != nil {
 		fmt.Printf("Error creating Jira client: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("✓ Jira client created successfully\n")
+	fmt.Println("✓ Jira client created successfully")
 
 	// Phase 1: Collect all PRs from all repositories
 	fmt.Println("=== Step 2: Collecting PRs from All Repositories ===")

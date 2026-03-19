@@ -1,0 +1,21 @@
+# Binaries
+jirasync
+skipjira
+list-gemini-models
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# User config (keep the template)
+jirasync-repos.yaml
+
+# Test files
+*.test
+*.out
