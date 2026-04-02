@@ -24,12 +24,12 @@ const (
 // Used when multiple PRs link to one Jira ticket to determine which state to use.
 func (s PRState) Priority() int {
 	switch s {
-	case PRStateDraft, PRStateChangesRequested:
-		return 1 // Most behind - needs work
+	case PRStateDraft, PRStateChangesRequested, PRStateClosed:
+		return 1 // Most behind - needs work (draft, changes needed, or abandoned)
 	case PRStateOpen, PRStateReviewRequested, PRStateApproved:
 		return 2 // In review
-	case PRStateMerged, PRStateClosed:
-		return 3 // Merged/closed - ready for QA (both map to "On QA")
+	case PRStateMerged:
+		return 3 // Merged - ready for QA
 	default:
 		return 999 // Unknown
 	}

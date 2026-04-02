@@ -20,8 +20,8 @@ func PRStateToJiraStatus(prState github.PRState) string {
 	case github.PRStateMerged:
 		return "On QA"
 	case github.PRStateClosed:
-		// Closed without merge still goes to On QA (don't auto-close tickets)
-		return "On QA"
+		// Closed without merge goes back to In Progress (work abandoned/needs redo)
+		return "In Progress"
 	default:
 		return ""
 	}

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Automatically extracts or AI-generates release notes from PRs and adds them as Jira comments.
+Automatically extracts or AI-generates release notes from merged PRs and adds them as Jira comments or field updates.
 
 ## Architecture
 
@@ -28,31 +28,34 @@ Automatically extracts or AI-generates release notes from PRs and adds them as J
 
 ## Two Execution Paths
 
+**Both paths only execute for merged PRs**
+
 ### Path 1: Extracted (Blue Panel)
-- **Trigger**: PR description has "Release Notes" section
-- **Process**: Extract → Clean → Add blue info panel to Jira
+- **Trigger**: Merged PR with "Release Notes" section in description
+- **Process**: Extract → Clean → Update Jira fields (if empty) → Add blue info panel to Jira
 - **Comment**: 📝 header, notes content, metadata (Type/Status), italic footer
 - **No @mention, no AI call**
 
 ### Path 2: AI-Generated (Orange Panel)
-- **Trigger**: No release notes in PR description
+- **Trigger**: Merged PR with no release notes in description
 - **Process**: Fetch PR context → Gemini API → Get assignee → Add orange warning panel
 - **Comment**: 🤖 header, AI notes, metadata, italic footer, @mention with review request
 - **Assignee notified**
 
 ## Edge Cases Handled
 
-1. **Multiple PR formats**: Supports `## Release Notes`, `### Release Notes`, `Release Notes:`, case-insensitive
-2. **Code fences**: Strips ``` markers from extracted notes
-3. **Missing release notes**: Falls back to AI generation
-4. **Missing assignee**: Adds comment without @mention (graceful degradation)
-5. **Multiple tickets per PR**: Same notes added to all linked tickets
-6. **Empty PR description**: AI uses title + diff + commits
-7. **Gemini API failures**: Logs warning, continues sync (non-blocking)
-8. **Jira API failures**: Logs warning, continues to next ticket (non-blocking)
-9. **Large diffs**: Truncates to 3000 chars (description: 2000 chars)
-10. **No Gemini key**: Only extraction works, feature disabled if no notes found
-11. **Duplicate runs**: Currently adds new comment each time (TODO: dedup)
+1. **Only merged PRs**: Release notes are only processed for merged PRs, not drafts or open PRs
+2. **Multiple PR formats**: Supports `## Release Notes`, `### Release Notes`, `Release Notes:`, case-insensitive
+3. **Code fences**: Strips ``` markers from extracted notes
+4. **Missing release notes**: Falls back to AI generation
+5. **Missing assignee**: Adds comment without @mention (graceful degradation)
+6. **Multiple tickets per PR**: Same notes added to all linked tickets
+7. **Empty PR description**: AI uses title + diff + commits
+8. **Gemini API failures**: Logs warning, continues sync (non-blocking)
+9. **Jira API failures**: Logs warning, continues to next ticket (non-blocking)
+10. **Large diffs**: Truncates to 3000 chars (description: 2000 chars)
+11. **No Gemini key**: Only extraction works, feature disabled if no notes found
+12. **Duplicate runs**: Currently adds new comment each time (TODO: dedup)
 
 ## Usage
 
@@ -112,7 +115,7 @@ repositories:
 ```
 PR Sync → Get PRs → For each PR:
   ├─ Find Jira tickets (JQL)
-  ├─ If Gemini configured:
+  ├─ If PR is merged AND Gemini configured:
   │   ├─ Try extract → Found? → Blue panel
   │   └─ Not found? → AI generate (fetch diff/commits) → Get assignee → Orange panel + @mention
   └─ Add comment to Jira (ADF)

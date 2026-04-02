@@ -1,0 +1,178 @@
+name: JiraSync - Automated PR to Jira Synchronization
+
+on:
+  # Run nightly at 1 AM UTC
+  schedule:
+    - cron: '0 1 * * *'
+
+  # Allow manual triggering with optional date parameter
+  workflow_dispatch:
+    inputs:
+      since:
+        description: 'Process PRs since this date (YYYY-MM-DD or DD/MM/YYYY). Leave empty for yesterday.'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run mode (test only, no transitions)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  jirasync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Build jirasync
+        run: |
+          echo "Building jirasync..."
+          go build -o jirasync ./cmd/jirasync
+          chmod +x jirasync
+
+      - name: Verify jirasync binary
+        run: |
+          echo "Verifying jirasync build..."
+          ./jirasync --help
+
+      - name: Run jirasync
+        env:
+          # GitHub credentials
+          GITHUB_TOKEN: ${{ secrets.JIRASYNC_GITHUB_TOKEN }}
+
+          # Jira credentials
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_PR_FIELD: ${{ secrets.JIRA_PR_FIELD }}
+
+          # Jira Release Notes fields (optional)
+          JIRA_RELEASE_NOTES_TEXT_FIELD: ${{ secrets.JIRA_RELEASE_NOTES_TEXT_FIELD }}
+          JIRA_RELEASE_NOTES_TYPE_FIELD: ${{ secrets.JIRA_RELEASE_NOTES_TYPE_FIELD }}
+          JIRA_RELEASE_NOTES_STATUS_FIELD: ${{ secrets.JIRA_RELEASE_NOTES_STATUS_FIELD }}
+
+          # Gemini API for release notes generation (optional)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+
+          # Slack notifications (optional)
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "=========================================="
+          echo "Starting JiraSync"
+          echo "=========================================="
+          echo ""
+
+          # Determine since date
+          if [ -n "${{ github.event.inputs.since }}" ]; then
+            SINCE_DATE="${{ github.event.inputs.since }}"
+            echo "Using custom date: $SINCE_DATE"
+          else
+            # Default to yesterday for scheduled runs
+            SINCE_DATE=""
+            echo "Using default date (yesterday)"
+          fi
+
+          # Build command with all parameters
+          CMD="./jirasync \
+            --config jirasync-repos.yaml \
+            --github-token \"$GITHUB_TOKEN\" \
+            --jira-url \"$JIRA_URL\" \
+            --jira-email \"$JIRA_EMAIL\" \
+            --jira-token \"$JIRA_TOKEN\" \
+            --jira-pr-field \"$JIRA_PR_FIELD\""
+
+          # Add since date if provided
+          if [ -n "$SINCE_DATE" ]; then
+            CMD="$CMD --since \"$SINCE_DATE\""
+          fi
+
+          # Add release notes fields if configured
+          if [ -n "$JIRA_RELEASE_NOTES_TEXT_FIELD" ]; then
+            CMD="$CMD --jira-release-notes-text-field \"$JIRA_RELEASE_NOTES_TEXT_FIELD\""
+          fi
+
+          if [ -n "$JIRA_RELEASE_NOTES_TYPE_FIELD" ]; then
+            CMD="$CMD --jira-release-notes-type-field \"$JIRA_RELEASE_NOTES_TYPE_FIELD\""
+          fi
+
+          if [ -n "$JIRA_RELEASE_NOTES_STATUS_FIELD" ]; then
+            CMD="$CMD --jira-release-notes-status-field \"$JIRA_RELEASE_NOTES_STATUS_FIELD\""
+          fi
+
+          # Add Gemini API key if configured
+          if [ -n "$GEMINI_API_KEY" ]; then
+            CMD="$CMD --gemini-api-key \"$GEMINI_API_KEY\""
+            echo "✓ Gemini API configured - AI release notes enabled"
+          else
+            echo "ℹ Gemini API not configured - only extraction-based release notes available"
+          fi
+
+          # Add Gemini model if configured
+          if [ -n "$GEMINI_MODEL" ]; then
+            CMD="$CMD --gemini-model \"$GEMINI_MODEL\""
+          fi
+
+          # Add Slack webhook if configured
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            CMD="$CMD --slack-webhook \"$SLACK_WEBHOOK_URL\""
+            echo "✓ Slack notifications enabled"
+          else
+            echo "ℹ Slack notifications not configured"
+          fi
+
+          echo ""
+          echo "Executing jirasync..."
+          echo ""
+
+          # Execute the command
+          eval $CMD
+
+          EXIT_CODE=$?
+
+          echo ""
+          echo "=========================================="
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✓ JiraSync completed successfully"
+          else
+            echo "✗ JiraSync failed with exit code: $EXIT_CODE"
+          fi
+          echo "=========================================="
+
+          exit $EXIT_CODE
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jirasync-logs-${{ github.run_id }}
+          path: |
+            *.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Notify on failure
+        if: failure() && secrets.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "❌ JiraSync workflow failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*JiraSync Failed*\n\nWorkflow run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>"
+                  }
+                }
+              ]
+            }'

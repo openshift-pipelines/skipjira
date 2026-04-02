@@ -5,27 +5,27 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift-pipelines/skipjira/internal/github"
-	"github.com/openshift-pipelines/skipjira/internal/jira"
-	"github.com/openshift-pipelines/skipjira/internal/slack"
 	gogithub "github.com/google/go-github/v81/github"
 	"github.com/openshift-pipelines/skipjira/internal/gemini"
+	"github.com/openshift-pipelines/skipjira/internal/github"
+	"github.com/openshift-pipelines/skipjira/internal/jira"
 	"github.com/openshift-pipelines/skipjira/internal/releasenotes"
+	"github.com/openshift-pipelines/skipjira/internal/slack"
 )
 
 // Syncer coordinates PR to Jira ticket synchronization
 type Syncer struct {
-	githubToken                string
-	jiraURL                    string
-	jiraEmail                  string
-	jiraToken                  string
-	jiraPRField                string
-	jiraReleaseNotesTextField  string
-	jiraReleaseNotesTypeField  string
+	githubToken                 string
+	jiraURL                     string
+	jiraEmail                   string
+	jiraToken                   string
+	jiraPRField                 string
+	jiraReleaseNotesTextField   string
+	jiraReleaseNotesTypeField   string
 	jiraReleaseNotesStatusField string
-	jiraClient                 *jira.Client
-	geminiClient               *gemini.Client
-	sinceTime                  time.Time
+	jiraClient                  *jira.Client
+	geminiClient                *gemini.Client
+	sinceTime                   time.Time
 }
 
 // SyncResult contains the results of syncing a repository
@@ -60,17 +60,17 @@ func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraRele
 	}
 
 	return &Syncer{
-		githubToken:                githubToken,
-		jiraURL:                    jiraURL,
-		jiraEmail:                  jiraEmail,
-		jiraToken:                  jiraToken,
-		jiraPRField:                jiraPRField,
-		jiraReleaseNotesTextField:  jiraReleaseNotesTextField,
-		jiraReleaseNotesTypeField:  jiraReleaseNotesTypeField,
+		githubToken:                 githubToken,
+		jiraURL:                     jiraURL,
+		jiraEmail:                   jiraEmail,
+		jiraToken:                   jiraToken,
+		jiraPRField:                 jiraPRField,
+		jiraReleaseNotesTextField:   jiraReleaseNotesTextField,
+		jiraReleaseNotesTypeField:   jiraReleaseNotesTypeField,
 		jiraReleaseNotesStatusField: jiraReleaseNotesStatusField,
-		jiraClient:                 jiraClient,
-		geminiClient:               geminiClient,
-		sinceTime:                  sinceTime,
+		jiraClient:                  jiraClient,
+		geminiClient:                geminiClient,
+		sinceTime:                   sinceTime,
 	}, nil
 }
 
@@ -113,15 +113,19 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 		}
 
 		fmt.Printf("  Found %d PRs updated since %s\n", len(prs), s.sinceTime.Format("2006-01-02"))
+		if len(prs) == 0 {
+			fmt.Printf("  ⓘ No PRs found. If you expect PRs here, try using --since with an earlier date\n")
+		}
 
 		// Process each PR
 		for _, pr := range prs {
 			prURL := pr.GetHTMLURL()
+			prNumber := pr.GetNumber()
 
 			// Get PR state
 			prState, err := ghClient.GetPRState(ctx, pr)
 			if err != nil {
-				results[repoIdx].Errors = append(results[repoIdx].Errors, fmt.Errorf("PR #%d: failed to get state: %w", pr.GetNumber(), err))
+				results[repoIdx].Errors = append(results[repoIdx].Errors, fmt.Errorf("PR #%d: failed to get state: %w", prNumber, err))
 				continue
 			}
 
@@ -132,22 +136,27 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 				continue
 			}
 
+			fmt.Printf("  PR #%d (%s) → target status: %s\n", prNumber, prState, targetStatus)
+
 			// Find Jira tickets linked to this PR
 			jql := fmt.Sprintf(`"%s" ~ "%s"`, s.jiraPRField, prURL)
 			issues, err := s.jiraClient.SearchIssuesWithStatusByJQL(jql)
 			if err != nil {
-				results[repoIdx].Errors = append(results[repoIdx].Errors, fmt.Errorf("PR #%d: JQL search failed: %w", pr.GetNumber(), err))
+				results[repoIdx].Errors = append(results[repoIdx].Errors, fmt.Errorf("PR #%d: JQL search failed: %w", prNumber, err))
 				continue
 			}
 
 			if len(issues) == 0 {
+				fmt.Printf("    ⚠ No Jira tickets linked\n")
 				unlinkedPRs++
 				results[repoIdx].PRsProcessed++
 				continue
 			}
 
-			// Add release notes to Jira tickets (if Gemini client is configured)
-			if s.geminiClient != nil {
+			fmt.Printf("    ✓ Linked to %d ticket(s): %v\n", len(issues), getIssueKeys(issues))
+
+			// Add release notes to Jira tickets only when PR is merged
+			if prState == github.PRStateMerged && s.geminiClient != nil {
 				s.addReleaseNotes(ctx, pr, issues, ghClient)
 			}
 
@@ -189,6 +198,13 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 	fmt.Printf("\n=== Processing Tickets (Global Batching) ===\n")
 	fmt.Printf("Found %d unique tickets across all repositories\n\n", len(globalTicketPRs))
 
+	if len(globalTicketPRs) == 0 {
+		fmt.Printf("⚠ No tickets to process. Possible reasons:\n")
+		fmt.Printf("  - No PRs found in date range (adjust --since)\n")
+		fmt.Printf("  - PRs found but not linked to Jira tickets\n")
+		fmt.Printf("  - Check logs above for 'No Jira tickets linked' warnings\n")
+	}
+
 	// Phase 2: Process each ticket once, using the most behind PR from any repo
 	totalTransitioned := 0
 	ticketsInCorrectStatus := 0
@@ -197,9 +213,11 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 	for issueKey, prs := range globalTicketPRs {
 		info := globalTicketInfo[issueKey]
 
+		fmt.Printf("Processing %s (current: '%s')\n", issueKey, info.Status)
+
 		// Skip tickets in terminal states
 		if info.Status == "Closed" || info.Status == "Done" {
-			fmt.Printf("  ⊗ %s: Already in terminal state '%s' - skipping\n", issueKey, info.Status)
+			fmt.Printf("  ⊗ Already in terminal state '%s' - skipping\n", info.Status)
 			continue
 		}
 		// Find the most behind PR across all repos
@@ -211,6 +229,7 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 		}
 
 		targetStatus := PRStateToJiraStatus(mostBehind.state)
+		fmt.Printf("  PR #%d state: %s → Jira target: '%s'\n", mostBehind.number, mostBehind.state, targetStatus)
 
 		// Log which repos have PRs for this ticket
 		if len(prs) > 1 {
@@ -304,6 +323,7 @@ func (s *Syncer) syncTicket(_ context.Context, issueKey, targetStatus, _, prStat
 
 	// Already in target state?
 	if currentStatus == targetStatus {
+		fmt.Printf("  ✓ %s: Already in target status '%s' (no action needed)\n", issueKey, targetStatus)
 		return false, "", nil
 	}
 
@@ -315,6 +335,7 @@ func (s *Syncer) syncTicket(_ context.Context, issueKey, targetStatus, _, prStat
 
 	if len(transitions) == 0 {
 		// No transitions available
+		fmt.Printf("  ⚠ %s: No transitions available from '%s' (check Jira workflow permissions)\n", issueKey, currentStatus)
 		return false, "", nil
 	}
 
@@ -359,6 +380,15 @@ func formatSteps(steps []string) string {
 		result += fmt.Sprintf("'%s'", step)
 	}
 	return result
+}
+
+// getIssueKeys extracts issue keys from search results
+func getIssueKeys(issues []jira.SearchIssue) []string {
+	keys := make([]string, len(issues))
+	for i, issue := range issues {
+		keys[i] = issue.Key
+	}
+	return keys
 }
 
 // addReleaseNotes extracts or generates release notes and adds them to Jira tickets

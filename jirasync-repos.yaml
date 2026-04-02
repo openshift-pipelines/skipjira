@@ -4,28 +4,41 @@
 # Copy this file to jirasync-repos.yaml and customize for your organization.
 
 repositories:
-  # to be changes once production ready
+  # to be changes once production readyru
+  - owner: tektoncd
+    name: results
+  - owner: tektoncd
+    name: operator
+  - owner: tektoncd
+    name: pruner
+  - owner: tektoncd
+    name: pipelines-as-code
+  - owner: tektoncd
+    name: plumbing
+  - owner: tektoncd
+    name: pipeline
+  - owner: tektoncd
+    name: cli
+  - owner: tektoncd
+    name: chains
+  - owner: tektoncd
+    name: triggers
+  - owner: tektoncd
+    name: catalog
+  - owner: tektoncd
+    name: hub
   - owner: openshift-pipelines
-    name: skipjira
-#  - owner: tektoncd
-#    name: results
-#  - owner: tektoncd
-#    name: operator
-#  - owner: tektoncd
-#    name: pruner
-#  - owner: tektoncd
-#    name: pipelines-as-code
-#  - owner: tektoncd
-#    name: plumbing
-#  - owner: tektoncd
-#    name: pipeline
-#  - owner: tektoncd
-#    name: cli
-#  - owner: tektoncd
-#    name: chains
-#  - owner: tektoncd
-#    name: triggers
-#  - owner: tektoncd
-#    name: catalog
-#  - owner: tektoncd
-#    name: hub
+    name: console-plugin
+  - owner: openshift-pipelines
+    name: opc
+  - owner: openshift-pipelines
+    name: hub
+  - owner: openshift-pipelines
+    name: manual-approval-gate
+  - owner: openshift-pipelines
+    name: tekton-caches
+ # multicluster repos
+  - owner: openshift-pipelines
+    name: tekton-kueue
+  - owner: openshift-pipelines
+    name: syncer-service
