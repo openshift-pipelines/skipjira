@@ -12,6 +12,7 @@
 - **Dynamic transition detection**: Uses Jira API to fetch available transitions (no hardcoding)
 - **Multi-step transitions**: Automatically navigates intermediate workflow states
 - **Global batching**: Handles tickets with PRs across multiple repositories
+- **Automated release notes**: Extracts or AI-generates release notes from merged PRs and updates Jira
 - **Slack integration**: Optional notifications for transitioned tickets
 - **Flexible date filtering**: Process PRs from specific dates or time ranges
 - **Terminal state protection**: Never auto-closes tickets (On QA is the furthest state)
@@ -24,9 +25,40 @@
 | Ready / Review Requested | Code Review |
 | Approved | Code Review |
 | Merged | On QA |
-| Closed (without merge) | On QA |
+| Closed (without merge) | In Progress |
 
 **Note:** Tickets are never automatically closed. "On QA" is the furthest automated state. Closing tickets should be done manually after QA verification.
+
+## Release Notes Feature
+
+jirasync can automatically extract or generate release notes from merged PRs and update Jira tickets:
+
+### How It Works
+
+1. **Only for merged PRs**: Release notes are processed exclusively for merged PRs to ensure they reflect shipped changes
+2. **Extraction first**: Looks for "Release Notes" section in PR description
+   - Supports: `## Release Notes`, `### Release Notes`, `Release Notes:`, `**Release Notes:**`
+   - Case-insensitive matching
+3. **AI generation fallback**: If no release notes found, uses Gemini AI to generate them from:
+   - PR title and description
+   - Commit messages
+   - Code diff (up to 3000 chars)
+4. **PR kind detection**: Determines if PR is a Bug Fix, Feature, or Enhancement from labels or AI
+
+### Jira Updates
+
+**For extracted release notes (blue info panel):**
+- Updates Jira release notes fields if they are empty
+- Adds blue info panel comment with field update notification
+- Includes PR kind and status metadata
+
+**For AI-generated release notes (orange warning panel):**
+- Adds orange warning panel comment (attention-grabbing)
+- Mentions assignee for review
+- Includes PR kind and status metadata
+- Does not auto-update fields (requires manual review)
+
+See [RELEASE_NOTES_DESIGN.md](../../docs/RELEASE_NOTES_DESIGN.md) for detailed design documentation.
 
 ## Installation
 
@@ -47,6 +79,7 @@ export JIRA_EMAIL=user@company.com
 export JIRA_TOKEN=xxxxx
 export JIRA_PR_FIELD=customfield_12345
 export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx  # Optional
+export GEMINI_API_KEY=xxxxx  # Optional, for release notes
 
 # Run test (does NOT execute transitions)
 go run ./test/jirasync/main.go
@@ -94,6 +127,13 @@ export JIRA_EMAIL=yourname@company.com
 export JIRA_TOKEN=xxxxx
 export JIRA_PR_FIELD=customfield_12345
 export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx  # Optional
+
+# Release Notes (Optional)
+export GEMINI_API_KEY=xxxxx  # Enables AI-generated release notes
+export GEMINI_MODEL=gemini-2.0-flash-exp  # Default: gemini-2.0-flash-exp
+export JIRA_RELEASE_NOTES_TEXT_FIELD=customfield_12317313  # Optional
+export JIRA_RELEASE_NOTES_TYPE_FIELD=customfield_12317314  # Optional
+export JIRA_RELEASE_NOTES_STATUS_FIELD=customfield_12317315  # Optional
 ```
 
 ## Usage
@@ -134,6 +174,23 @@ jirasync \
   --jira-pr-field customfield_12345 \
   --slack-webhook $SLACK_WEBHOOK_URL
 ```
+
+With release notes (AI-generation enabled):
+```bash
+jirasync \
+  --config repos.yaml \
+  --github-token $GITHUB_TOKEN \
+  --jira-url $JIRA_URL \
+  --jira-email $JIRA_EMAIL \
+  --jira-token $JIRA_TOKEN \
+  --jira-pr-field customfield_12345 \
+  --gemini-api-key $GEMINI_API_KEY \
+  --jira-release-notes-text-field customfield_12317313 \
+  --jira-release-notes-type-field customfield_12317314 \
+  --jira-release-notes-status-field customfield_12317315
+```
+
+**Note:** Release notes fields are optional. If not provided, jirasync will only add comments to Jira tickets.
 
 Supported date formats for `--since`:
 - ISO format: `2026-03-16` (YYYY-MM-DD)
@@ -178,6 +235,10 @@ jobs:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
           JIRA_PR_FIELD: ${{ secrets.JIRA_PR_FIELD }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  # Optional
+          JIRA_RELEASE_NOTES_TEXT_FIELD: ${{ secrets.JIRA_RELEASE_NOTES_TEXT_FIELD }}  # Optional
+          JIRA_RELEASE_NOTES_TYPE_FIELD: ${{ secrets.JIRA_RELEASE_NOTES_TYPE_FIELD }}  # Optional
+          JIRA_RELEASE_NOTES_STATUS_FIELD: ${{ secrets.JIRA_RELEASE_NOTES_STATUS_FIELD }}  # Optional
         run: |
           # Defaults to yesterday's date automatically
           jirasync \
@@ -187,7 +248,11 @@ jobs:
             --jira-email "$JIRA_EMAIL" \
             --jira-token "$JIRA_TOKEN" \
             --jira-pr-field "$JIRA_PR_FIELD" \
-            --slack-webhook "$SLACK_WEBHOOK_URL"
+            --slack-webhook "$SLACK_WEBHOOK_URL" \
+            --gemini-api-key "$GEMINI_API_KEY" \
+            --jira-release-notes-text-field "$JIRA_RELEASE_NOTES_TEXT_FIELD" \
+            --jira-release-notes-type-field "$JIRA_RELEASE_NOTES_TYPE_FIELD" \
+            --jira-release-notes-status-field "$JIRA_RELEASE_NOTES_STATUS_FIELD"
 ```
 
 ### Run via Cron
@@ -226,14 +291,18 @@ SRVKP-11090 `To Do` → `Code Review` ✅ APPLIED
 1. **Global Collection**: For each repository in the config, jirasync collects all PRs updated since the specified date
 2. **State Detection**: Determines PR state (draft, approved, merged, closed) using GitHub API
 3. **Ticket Lookup**: Finds Jira tickets linked to each PR via JQL search on the PR URL field
-4. **Global Batching**: Groups all PRs by ticket across all repositories to avoid duplicate transitions
-5. **Transition Strategy**: For tickets with multiple PRs, uses the "most behind" PR state to determine target status
-6. **Transition Execution**:
+4. **Release Notes Processing** (for merged PRs only, if Gemini configured):
+   - Attempts to extract release notes from PR description
+   - Falls back to AI generation if not found
+   - Updates Jira fields (if configured and empty) or adds comments
+5. **Global Batching**: Groups all PRs by ticket across all repositories to avoid duplicate transitions
+6. **Transition Strategy**: For tickets with multiple PRs, uses the "most behind" PR state to determine target status
+7. **Transition Execution**:
    - Fetches available transitions from Jira API
    - Attempts direct transition first
    - Falls back to multi-step transition (max 3 steps) if needed
    - Skips tickets already in terminal states (Closed/Done)
-7. **Notification**: Sends Slack notification with results (if configured)
+8. **Notification**: Sends Slack notification with results (if configured)
 
 ## Multi-Step Transitions
 
@@ -292,9 +361,12 @@ Starting jirasync for 2 repositories
 
 === Collecting PRs from myorg/backend ===
   Found 5 PRs updated since 2026-03-16
+  ✓ PR #42: Updated fields and added notification to PROJ-123 (PR Kind: Feature)
+  ✓ PR #45: Added AI-generated release notes comment to PROJ-456 (PR Kind: Bug Fix)
 
 === Collecting PRs from myorg/frontend ===
   Found 3 PRs updated since 2026-03-16
+  ✓ PR #15: Updated fields and added notification to PROJ-789 (PR Kind: Enhancement)
 
 === Processing Tickets (Global Batching) ===
 Found 4 unique tickets across all repositories
@@ -362,3 +434,19 @@ Total:
 - Check Slack app permissions
 - Test webhook manually with curl
 - Check logs for specific error messages
+
+### Release notes not generated
+
+- Ensure `--gemini-api-key` is provided (required for AI generation)
+- Check Gemini API quota and rate limits (1500/day, 15/min)
+- Verify PR is in **merged** state (release notes only process merged PRs)
+- Check logs for Gemini API errors
+- Test extraction: ensure PR has "Release Notes" section in description
+
+### Release notes not updating Jira fields
+
+- Verify field IDs are correct (use `?expand=fields` on Jira ticket URL)
+- Check if fields are already populated (jirasync only updates empty fields)
+- Ensure fields are configured in Jira and accessible
+- Check field permissions
+- For extracted notes: fields are updated; for AI-generated: only comments are added (requires manual review)
