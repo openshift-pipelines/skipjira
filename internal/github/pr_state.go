@@ -38,14 +38,17 @@ func (s PRState) Priority() int {
 // GetPRState determines the state of a pull request
 // Following the logic from ospctl/test/main.go
 func (c *Client) GetPRState(ctx context.Context, pr *github.PullRequest) (PRState, error) {
-	// Check if closed without merge
-	if pr.GetState() == "closed" && !pr.GetMerged() {
-		return PRStateClosed, nil
+	// Check if merged first - MergedAt is more reliable than Merged field
+	// When listing PRs, the Merged boolean field is sometimes not populated,
+	// but MergedAt timestamp is always set for merged PRs
+	if pr.MergedAt != nil && !pr.MergedAt.IsZero() {
+		return PRStateMerged, nil
 	}
 
-	// Check if merged
-	if pr.GetMerged() {
-		return PRStateMerged, nil
+	// Check if closed without merge
+	// If we reach here, MergedAt is nil/zero, so this is truly a closed (not merged) PR
+	if pr.GetState() == "closed" {
+		return PRStateClosed, nil
 	}
 
 	// Check if draft
