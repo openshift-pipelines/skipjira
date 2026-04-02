@@ -27,3 +27,18 @@ repositories:
     name: catalog
   - owner: tektoncd
     name: hub
+  - owner: openshift-pipelines
+    name: console-plugin
+  - owner: openshift-pipelines
+    name: opc
+  - owner: openshift-pipelines
+    name: hub
+  - owner: openshift-pipelines
+    name: manual-approval-gate
+  - owner: openshift-pipelines
+    name: tekton-caches
+ # multicluster repos
+  - owner: openshift-pipelines
+    name: tekton-kueue
+  - owner: openshift-pipelines
+    name: syncer-service
