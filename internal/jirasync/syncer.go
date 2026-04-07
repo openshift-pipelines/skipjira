@@ -156,8 +156,15 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 			fmt.Printf("    ✓ Linked to %d ticket(s): %v\n", len(issues), getIssueKeys(issues))
 
 			// Add release notes to Jira tickets only when PR is merged
-			if prState == github.PRStateMerged && s.geminiClient != nil {
-				s.addReleaseNotes(ctx, pr, issues, ghClient)
+			if prState == github.PRStateMerged {
+				if s.geminiClient != nil {
+					fmt.Printf("    📝 Processing release notes (PR is merged)...\n")
+					s.addReleaseNotes(ctx, pr, issues, ghClient)
+				} else {
+					fmt.Printf("    ⓘ Skipping release notes: Gemini API not configured (extraction-only mode available)\n")
+				}
+			} else {
+				fmt.Printf("    ⓘ Skipping release notes: PR not merged (current state: %s)\n", prState)
 			}
 
 			// Add this PR to global ticket mapping and store ticket metadata
@@ -398,63 +405,92 @@ func (s *Syncer) addReleaseNotes(ctx context.Context, pr *gogithub.PullRequest, 
 	// Extract or generate release notes
 	result, err := releasenotes.GetOrGenerate(ctx, pr, ghClient, s.geminiClient)
 	if err != nil {
-		fmt.Printf("  ⚠ PR #%d: Failed to get release notes: %v\n", pr.GetNumber(), err)
+		fmt.Printf("      ⚠ Failed to get release notes: %v\n", err)
 		return
+	}
+
+	// Log what was found
+	if result.IsGenerated {
+		fmt.Printf("      🤖 AI-generated release notes (no release notes found in PR description)\n")
+		fmt.Printf("         PR Kind: %s\n", result.Kind)
+	} else {
+		fmt.Printf("      📝 Extracted release notes from PR description\n")
+		fmt.Printf("         PR Kind: %s (from labels or AI)\n", result.Kind)
 	}
 
 	// Process each linked Jira ticket
 	releaseNotesStatus := "Proposed"
 
 	for _, issue := range issues {
+		fmt.Printf("      → Processing %s...\n", issue.Key)
+
 		if result.IsGenerated {
 			// AI-generated: Add orange warning panel with assignee mention
+			fmt.Printf("         Approach: Add AI-generated comment with assignee mention\n")
+
 			// Get assignee account ID
 			fullIssue, err := s.jiraClient.GetIssueWithFields(issue.Key, []string{"assignee"})
 			if err != nil {
-				fmt.Printf("  ⚠ PR #%d: Failed to get assignee for %s: %v\n", pr.GetNumber(), issue.Key, err)
+				fmt.Printf("         ⚠ Failed to get assignee: %v\n", err)
 				// Fall back to comment without mention
 				if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, ""); err != nil {
-					fmt.Printf("  ⚠ PR #%d: Failed to add comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+					fmt.Printf("         ✗ Failed to add comment: %v\n", err)
 				} else {
-					fmt.Printf("  ✓ PR #%d: Added AI-generated release notes comment to %s\n", pr.GetNumber(), issue.Key)
+					fmt.Printf("         ✓ Added AI-generated comment (no assignee mention)\n")
 				}
 				continue
 			}
 
 			// Extract assignee account ID
 			assigneeId := ""
-			if assignee, ok := fullIssue.Fields["assignee"].(map[string]interface{}); ok {
+			assigneeName := "unassigned"
+			if assignee, ok := fullIssue.Fields["assignee"].(map[string]interface{}); ok && assignee != nil {
 				if accountId, ok := assignee["accountId"].(string); ok {
 					assigneeId = accountId
+				}
+				if displayName, ok := assignee["displayName"].(string); ok {
+					assigneeName = displayName
 				}
 			}
 
 			// Add comment with mention, PR kind, and status
 			if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, assigneeId); err != nil {
-				fmt.Printf("  ⚠ PR #%d: Failed to add comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+				fmt.Printf("         ✗ Failed to add comment: %v\n", err)
 			} else {
-				fmt.Printf("  ✓ PR #%d: Added AI-generated release notes comment to %s (PR Kind: %s)\n", pr.GetNumber(), issue.Key, result.Kind)
+				if assigneeId != "" {
+					fmt.Printf("         ✓ Added AI-generated comment with @mention to %s\n", assigneeName)
+				} else {
+					fmt.Printf("         ✓ Added AI-generated comment (ticket unassigned)\n")
+				}
 			}
 		} else {
 			// Extracted from PR: Try to update fields first
+			fmt.Printf("         Approach: Update Jira fields + add notification comment\n")
+
 			updated, err := s.jiraClient.UpdateReleaseNotesFields(issue.Key, result.Notes, result.Kind, releaseNotesStatus)
 			if err != nil {
 				// Field update failed - fall back to comment-only approach
-				fmt.Printf("  ⚠ PR #%d: Failed to update fields for %s, using comment: %v\n", pr.GetNumber(), issue.Key, err)
+				fmt.Printf("         ⚠ Field update failed: %v\n", err)
+				fmt.Printf("         Fallback: Adding comment instead...\n")
+
 				if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, ""); err != nil {
-					fmt.Printf("  ⚠ PR #%d: Failed to add comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+					fmt.Printf("         ✗ Failed to add comment: %v\n", err)
 				} else {
-					fmt.Printf("  ✓ PR #%d: Added release notes comment to %s (PR Kind: %s, field update failed)\n", pr.GetNumber(), issue.Key, result.Kind)
+					fmt.Printf("         ✓ Added release notes comment (fields not updated)\n")
 				}
 			} else if updated {
 				// Field update succeeded - add notification comment
+				fmt.Printf("         ✓ Updated Jira fields\n")
+
 				if err := s.jiraClient.AddFieldUpdateComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus); err != nil {
-					fmt.Printf("  ⚠ PR #%d: Failed to add notification comment to %s: %v\n", pr.GetNumber(), issue.Key, err)
+					fmt.Printf("         ⚠ Failed to add notification comment: %v\n", err)
 				} else {
-					fmt.Printf("  ✓ PR #%d: Updated fields and added notification to %s (PR Kind: %s)\n", pr.GetNumber(), issue.Key, result.Kind)
+					fmt.Printf("         ✓ Added field update notification comment\n")
 				}
+			} else {
+				// Fields already populated - skip silently
+				fmt.Printf("         ⓘ Jira fields already populated - skipping\n")
 			}
-			// If updated is false and err is nil: fields already populated, no message printed
 		}
 	}
 }
