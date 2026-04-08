@@ -144,12 +144,16 @@ func runSync(cmd *cobra.Command, args []string) error {
 func printSummary(summary *jirasync.SyncSummary) {
 	fmt.Println("\n=== Sync Summary ===")
 	totalPRs := 0
+	totalSkipped := 0
 	totalTickets := 0
 	totalErrors := 0
 
 	for _, result := range summary.Results {
 		fmt.Printf("\n%s/%s:\n", result.Repository.Owner, result.Repository.Name)
 		fmt.Printf("  PRs processed: %d\n", result.PRsProcessed)
+		if result.PRsSkipped > 0 {
+			fmt.Printf("  PRs skipped (not in users list): %d\n", result.PRsSkipped)
+		}
 		fmt.Printf("  Tickets transitioned: %d\n", result.TicketsTransitioned)
 		if len(result.Errors) > 0 {
 			fmt.Printf("  Errors: %d\n", len(result.Errors))
@@ -159,12 +163,16 @@ func printSummary(summary *jirasync.SyncSummary) {
 		}
 
 		totalPRs += result.PRsProcessed
+		totalSkipped += result.PRsSkipped
 		totalTickets += result.TicketsTransitioned
 		totalErrors += len(result.Errors)
 	}
 
 	fmt.Printf("\nTotal:\n")
-	fmt.Printf("  PRs: %d\n", totalPRs)
+	fmt.Printf("  PRs processed: %d\n", totalPRs)
+	if totalSkipped > 0 {
+		fmt.Printf("  PRs skipped (not in users list): %d\n", totalSkipped)
+	}
 	fmt.Printf("  Tickets transitioned: %d\n", totalTickets)
 	fmt.Printf("  Tickets already in correct status: %d\n", summary.TicketsInCorrectStatus)
 	fmt.Printf("  Unlinked PRs: %d\n", summary.UnlinkedPRs)
