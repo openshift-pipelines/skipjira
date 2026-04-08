@@ -131,6 +131,7 @@ func main() {
 	})
 
 	totalPRs := 0
+	totalSkipped := 0
 	unlinkedPRs := 0
 	for _, repo := range repos {
 		fmt.Printf("\nRepository: %s/%s\n", repo.Owner, repo.Name)
@@ -143,7 +144,9 @@ func main() {
 		}
 
 		fmt.Printf("  Found %d PRs\n", len(prs))
-		totalPRs += len(prs)
+		if len(allowedUsers) > 0 {
+			fmt.Printf("  Filtering to configured users (%d total)\n", len(allowedUsers))
+		}
 
 		// Get PR states and link to tickets
 		for _, pr := range prs {
@@ -152,9 +155,11 @@ func main() {
 				author := strings.ToLower(pr.GetUser().GetLogin())
 				if !allowedUsers[author] {
 					fmt.Printf("  PR #%d by %s — skipping (not in users list)\n", pr.GetNumber(), pr.GetUser().GetLogin())
+					totalSkipped++
 					continue
 				}
 			}
+			totalPRs++
 
 			state, err := ghClient.GetPRState(ctx, pr)
 			if err != nil {
@@ -219,7 +224,10 @@ func main() {
 
 	fmt.Printf("\n=== Collection Summary ===\n")
 	fmt.Printf("Total repositories: %d\n", len(repos))
-	fmt.Printf("Total PRs collected: %d\n", totalPRs)
+	fmt.Printf("Total PRs processed: %d\n", totalPRs)
+	if totalSkipped > 0 {
+		fmt.Printf("Total PRs skipped (not in users list): %d\n", totalSkipped)
+	}
 	fmt.Printf("Unique Jira tickets: %d\n", len(globalTicketPRs))
 
 	// Count cross-repo tickets
@@ -397,7 +405,10 @@ func main() {
 	fmt.Printf("Overall Summary\n")
 	fmt.Printf("═══════════════════════════════════════════════════════════\n")
 	fmt.Printf("Total repositories: %d\n", len(repos))
-	fmt.Printf("Total PRs collected: %d\n", totalPRs)
+	fmt.Printf("Total PRs processed: %d\n", totalPRs)
+	if totalSkipped > 0 {
+		fmt.Printf("Total PRs skipped (not in users list): %d\n", totalSkipped)
+	}
 	fmt.Printf("Unique Jira tickets: %d\n", len(globalTicketPRs))
 	fmt.Printf("Tickets with cross-repo PRs: %d\n", crossRepoTickets)
 	fmt.Printf("Transitions that would be executed: %d\n", transitionsFound)

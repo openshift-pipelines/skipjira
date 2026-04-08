@@ -33,6 +33,7 @@ type Syncer struct {
 type SyncResult struct {
 	Repository          Repository
 	PRsProcessed        int
+	PRsSkipped          int
 	TicketsTransitioned int
 	Errors              []error
 }
