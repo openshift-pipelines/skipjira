@@ -26,6 +26,7 @@ var (
 	geminiModel                 string
 	since                       string
 	slackWebhook                string
+	transitionComment           bool
 )
 
 var rootCmd = &cobra.Command{
@@ -60,6 +61,7 @@ func init() {
 	rootCmd.Flags().StringVar(&geminiModel, "gemini-model", "", "Gemini model to use (optional, defaults to gemini-3-flash-preview)")
 	rootCmd.Flags().StringVar(&since, "since", "", "Only process PRs updated since this date (format: 2006-01-02 or DD/MM/YYYY). Defaults to yesterday if not provided.")
 	rootCmd.Flags().StringVar(&slackWebhook, "slack-webhook", "", "Slack webhook URL for notifications (optional)")
+	rootCmd.Flags().BoolVar(&transitionComment, "transition-comment", false, "Add a Jira comment on each transitioned ticket explaining the reason (optional)")
 
 	rootCmd.MarkFlagRequired("config")
 	rootCmd.MarkFlagRequired("github-token")
@@ -106,6 +108,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		geminiAPIKey,
 		geminiModel,
 		sinceTime,
+		transitionComment,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create syncer: %w", err)
