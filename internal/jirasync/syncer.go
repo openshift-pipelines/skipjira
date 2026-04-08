@@ -3,6 +3,7 @@ package jirasync
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	gogithub "github.com/google/go-github/v81/github"
@@ -76,8 +77,13 @@ func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraRele
 
 // SyncAll syncs all repositories
 // Batches PRs across all repos to avoid multiple transitions for tickets with cross-repo PRs
-func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncSummary, error) {
+func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users []string) (*SyncSummary, error) {
 	fmt.Printf("\nStarting jirasync for %d repositories\n\n", len(repositories))
+
+	allowedUsers := make(map[string]bool, len(users))
+	for _, u := range users {
+		allowedUsers[strings.ToLower(u)] = true
+	}
 
 	// Phase 1: Collect all PRs from all repositories
 	type repoPRInfo struct {
@@ -121,6 +127,14 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository) (*SyncS
 		for _, pr := range prs {
 			prURL := pr.GetHTMLURL()
 			prNumber := pr.GetNumber()
+
+			if len(allowedUsers) > 0 {
+				author := strings.ToLower(pr.GetUser().GetLogin())
+				if !allowedUsers[author] {
+					fmt.Printf("  PR #%d by %s — skipping (not in users list)\n", prNumber, pr.GetUser().GetLogin())
+					continue
+				}
+			}
 
 			// Get PR state
 			prState, err := ghClient.GetPRState(ctx, pr)

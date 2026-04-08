@@ -43,7 +43,27 @@ jobs:
           echo "Verifying jirasync build..."
           ./jirasync --help
 
+      - name: Run jirasync (dry-run)
+        if: github.event.inputs.dry_run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.JIRASYNC_GITHUB_TOKEN }}
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_PR_FIELD: ${{ secrets.JIRA_PR_FIELD }}
+        run: |
+          echo "=========================================="
+          echo "DRY RUN MODE - no transitions will be executed"
+          echo "=========================================="
+          echo ""
+          go run ./test/jirasync --config jirasync-repos.yaml
+          echo ""
+          echo "=========================================="
+          echo "✓ Dry run complete"
+          echo "=========================================="
+
       - name: Run jirasync
+        if: github.event.inputs.dry_run != 'true'
         env:
           # GitHub credentials
           GITHUB_TOKEN: ${{ secrets.JIRASYNC_GITHUB_TOKEN }}

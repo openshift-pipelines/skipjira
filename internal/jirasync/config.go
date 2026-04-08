@@ -12,6 +12,7 @@ import (
 // Config represents jirasync configuration
 type Config struct {
 	Repositories []Repository `yaml:"repositories"`
+	Users        []string     `yaml:"users"`
 }
 
 // Repository represents a GitHub repository to monitor

@@ -1,7 +1,7 @@
 # Binaries
-jirasync
-skipjira
-list-gemini-models
+/jirasync
+/skipjira
+/list-gemini-models
 
 # IDE
 .idea/
@@ -12,9 +12,6 @@ list-gemini-models
 
 # OS
 .DS_Store
-
-# User config (keep the template)
-jirasync-repos.yaml
 
 # Test files
 *.test
