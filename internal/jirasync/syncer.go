@@ -27,6 +27,7 @@ type Syncer struct {
 	jiraClient                  *jira.Client
 	geminiClient                *gemini.Client
 	sinceTime                   time.Time
+	transitionComment           bool
 }
 
 // SyncResult contains the results of syncing a repository
@@ -47,7 +48,7 @@ type SyncSummary struct {
 }
 
 // NewSyncer creates a new syncer instance
-func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField, geminiAPIKey, geminiModel string, sinceTime time.Time) (*Syncer, error) {
+func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField, geminiAPIKey, geminiModel string, sinceTime time.Time, transitionComment bool) (*Syncer, error) {
 	jiraClient, err := jira.NewClient(jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira client: %w", err)
@@ -73,6 +74,7 @@ func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraRele
 		jiraClient:                  jiraClient,
 		geminiClient:                geminiClient,
 		sinceTime:                   sinceTime,
+		transitionComment:           transitionComment,
 	}, nil
 }
 
@@ -133,6 +135,7 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 				author := strings.ToLower(pr.GetUser().GetLogin())
 				if !allowedUsers[author] {
 					fmt.Printf("  PR #%d by %s — skipping (not in users list)\n", prNumber, pr.GetUser().GetLogin())
+					results[repoIdx].PRsSkipped++
 					continue
 				}
 			}
@@ -296,6 +299,25 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 					results[i].Repository.Name == mostBehind.repo.Name {
 					results[i].TicketsTransitioned++
 					break
+				}
+			}
+
+			// Add a transition comment explaining why the ticket was moved
+			if s.transitionComment {
+				comment := fmt.Sprintf(
+					"jirasync moved this ticket from '%s' to '%s' because PR #%d in %s/%s %s.\n%s",
+					info.Status,
+					targetStatus,
+					mostBehind.number,
+					mostBehind.repo.Owner,
+					mostBehind.repo.Name,
+					prStateReason(mostBehind.state),
+					mostBehind.url,
+				)
+				if err := s.jiraClient.AddComment(issueKey, comment); err != nil {
+					fmt.Printf("  ⚠ %s: failed to add transition comment: %v\n", issueKey, err)
+				} else {
+					fmt.Printf("  💬 %s: transition comment added\n", issueKey)
 				}
 			}
 
@@ -507,5 +529,27 @@ func (s *Syncer) addReleaseNotes(ctx context.Context, pr *gogithub.PullRequest, 
 				fmt.Printf("         ⓘ Jira fields already populated - skipping\n")
 			}
 		}
+	}
+}
+
+// prStateReason returns a human-readable explanation for why a PR's state triggers a Jira transition
+func prStateReason(state github.PRState) string {
+	switch state {
+	case github.PRStateMerged:
+		return "was merged"
+	case github.PRStateDraft:
+		return "is a draft"
+	case github.PRStateChangesRequested:
+		return "has changes requested"
+	case github.PRStateClosed:
+		return "was closed without merging"
+	case github.PRStateOpen:
+		return "is open and ready for review"
+	case github.PRStateReviewRequested:
+		return "has a review requested"
+	case github.PRStateApproved:
+		return "is approved"
+	default:
+		return string(state)
 	}
 }

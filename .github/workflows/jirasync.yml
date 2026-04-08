@@ -108,7 +108,8 @@ jobs:
             --jira-url \"$JIRA_URL\" \
             --jira-email \"$JIRA_EMAIL\" \
             --jira-token \"$JIRA_TOKEN\" \
-            --jira-pr-field \"$JIRA_PR_FIELD\""
+            --jira-pr-field \"$JIRA_PR_FIELD\" \
+            --transition-comment"
 
           # Add since date if provided
           if [ -n "$SINCE_DATE" ]; then

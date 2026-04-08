@@ -9,10 +9,12 @@
 ## Features
 
 - **Cross-repository support**: Monitor PRs across multiple GitHub repositories
+- **User filtering**: Only process PRs authored by a configured list of users
 - **Dynamic transition detection**: Uses Jira API to fetch available transitions (no hardcoding)
 - **Multi-step transitions**: Automatically navigates intermediate workflow states
 - **Global batching**: Handles tickets with PRs across multiple repositories
 - **Automated release notes**: Extracts or AI-generates release notes from merged PRs and updates Jira
+- **Transition comments**: Optionally adds a Jira comment on each transitioned ticket explaining why it was moved
 - **Slack integration**: Optional notifications for transitioned tickets
 - **Flexible date filtering**: Process PRs from specific dates or time ranges
 - **Terminal state protection**: Never auto-closes tickets (On QA is the furthest state)
