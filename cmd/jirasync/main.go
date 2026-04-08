@@ -113,7 +113,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	// Run sync
 	ctx := context.Background()
-	summary, err := syncer.SyncAll(ctx, cfg.Repositories)
+	summary, err := syncer.SyncAll(ctx, cfg.Repositories, cfg.Users)
 	if err != nil {
 		return fmt.Errorf("sync failed: %w", err)
 	}
