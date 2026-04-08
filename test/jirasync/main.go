@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/openshift-pipelines/skipjira/internal/github"
 	"github.com/openshift-pipelines/skipjira/internal/jira"
 	"github.com/openshift-pipelines/skipjira/internal/jirasync"
-	"github.com/openshift-pipelines/skipjira/internal/slack"
+	"github.com/openshift-pipelines/skipjira/internal/slack" // used for TransitionNotification/PRInfo types
 )
 
 func main() {
@@ -49,14 +50,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Check for Slack webhook URL (optional)
-	slackWebhookURL := os.Getenv("SLACK_WEBHOOK_URL")
-	if slackWebhookURL != "" {
-		fmt.Println("📢 Slack notifications enabled")
-	}
 
 	// Parse arguments
 	var repos []jirasync.Repository
+	var configuredUsers []string
 
 	if len(os.Args) == 1 {
 		// No args - use default
@@ -76,6 +73,7 @@ func main() {
 			os.Exit(1)
 		}
 		repos = cfg.Repositories
+		configuredUsers = cfg.Users
 	} else if len(os.Args) >= 3 {
 		// Single repo mode
 		repos = []jirasync.Repository{
@@ -95,6 +93,15 @@ func main() {
 	fmt.Printf("Fetching PRs updated since %s\n\n", sinceTime.Format("2006-01-02"))
 
 	ctx := context.Background()
+
+	// Build case-insensitive set of allowed users (empty = allow all)
+	allowedUsers := make(map[string]bool, len(configuredUsers))
+	for _, u := range configuredUsers {
+		allowedUsers[strings.ToLower(u)] = true
+	}
+	if len(allowedUsers) > 0 {
+		fmt.Printf("Filtering PRs to %d configured users\n", len(allowedUsers))
+	}
 
 	// Step 3: Connect to Jira
 	fmt.Println("=== Step 1: Connecting to Jira ===")
@@ -140,6 +147,15 @@ func main() {
 
 		// Get PR states and link to tickets
 		for _, pr := range prs {
+			// Skip PRs not authored by a configured user (if user list is set)
+			if len(allowedUsers) > 0 {
+				author := strings.ToLower(pr.GetUser().GetLogin())
+				if !allowedUsers[author] {
+					fmt.Printf("  PR #%d by %s — skipping (not in users list)\n", pr.GetNumber(), pr.GetUser().GetLogin())
+					continue
+				}
+			}
+
 			state, err := ghClient.GetPRState(ctx, pr)
 			if err != nil {
 				fmt.Printf("  ⚠ Warning: Failed to get state for PR #%d\n", pr.GetNumber())
@@ -350,8 +366,8 @@ func main() {
 			}
 		}
 
-		// Collect Slack notification only for tickets with clear transition path
-		if slackWebhookURL != "" && canTransition {
+		// Collect what a Slack notification would contain (dry-run: logged only, not sent)
+		if canTransition {
 			// Build PR list for Slack
 			slackPRs := make([]slack.PRInfo, len(prs))
 			for i, pr := range prs {
@@ -386,26 +402,14 @@ func main() {
 	fmt.Printf("Tickets with cross-repo PRs: %d\n", crossRepoTickets)
 	fmt.Printf("Transitions that would be executed: %d\n", transitionsFound)
 
-	// Send Slack notification
-	if slackWebhookURL != "" && len(slackNotifications) > 0 {
-		fmt.Printf("\n📢 Sending Slack notification for %d tickets...\n", len(slackNotifications))
-		slackClient := slack.NewClient(slackWebhookURL)
-
-		stats := slack.SummaryStats{
-			TicketsInCorrectStatus: ticketsInCorrectStatus,
-			UnlinkedPRs:            unlinkedPRs,
-		}
-
-		if err := slackClient.SendTransitionSummary(slackNotifications, true, stats); err != nil {
-			fmt.Printf("  ⚠ Failed to send Slack notification: %v\n", err)
-		} else {
-			fmt.Printf("  ✓ Slack notification sent successfully\n")
+	// Dry-run: log what Slack notification would be sent, but don't actually send it
+	if len(slackNotifications) > 0 {
+		fmt.Printf("\n📢 [DRY RUN] Would send Slack notification for %d ticket(s):\n", len(slackNotifications))
+		for _, n := range slackNotifications {
+			fmt.Printf("  %s: '%s' → '%s'\n", n.IssueKey, n.CurrentStatus, n.TargetStatus)
 		}
 	}
 
 	fmt.Println("\nTest complete! No actual transitions were executed.")
 	fmt.Println("To execute transitions, use: jirasync --config repos.yaml ...")
-	if slackWebhookURL == "" {
-		fmt.Println("\nTip: Set SLACK_WEBHOOK_URL env var to enable Slack notifications")
-	}
 }
