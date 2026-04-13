@@ -304,8 +304,8 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 
 			// Add a transition comment explaining why the ticket was moved
 			if s.transitionComment {
-				comment := fmt.Sprintf(
-					"jirasync moved this ticket from '%s' to '%s' because PR #%d in %s/%s %s.\n%s",
+				if err := s.jiraClient.AddTransitionComment(
+					issueKey,
 					info.Status,
 					targetStatus,
 					mostBehind.number,
@@ -313,8 +313,7 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 					mostBehind.repo.Name,
 					prStateReason(mostBehind.state),
 					mostBehind.url,
-				)
-				if err := s.jiraClient.AddComment(issueKey, comment); err != nil {
+				); err != nil {
 					fmt.Printf("  ⚠ %s: failed to add transition comment: %v\n", issueKey, err)
 				} else {
 					fmt.Printf("  💬 %s: transition comment added\n", issueKey)

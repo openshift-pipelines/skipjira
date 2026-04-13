@@ -126,6 +126,133 @@ func (c *Client) AddFieldUpdateComment(issueKey, releaseNotes, prKind, status st
 	return nil
 }
 
+// AddTransitionComment adds a styled comment when jirasync transitions a ticket
+func (c *Client) AddTransitionComment(issueKey, fromStatus, toStatus string, prNumber int, repoOwner, repoName, prStateReason, prURL string) error {
+	url := c.apiURL(fmt.Sprintf("/rest/api/3/issue/%s/comment", issueKey))
+
+	adfComment := buildTransitionADF(fromStatus, toStatus, prNumber, repoOwner, repoName, prStateReason, prURL)
+
+	payload := map[string]interface{}{
+		"body": adfComment,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal comment payload: %w", err)
+	}
+
+	req, err := c.newRequest(http.MethodPost, url, bytes.NewReader(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to add comment: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if err := c.checkResponse(resp, http.StatusCreated); err != nil {
+		return fmt.Errorf("failed to add comment: %w", err)
+	}
+
+	return nil
+}
+
+// buildTransitionADF creates an ADF document for a transition comment
+func buildTransitionADF(fromStatus, toStatus string, prNumber int, repoOwner, repoName, prStateReason, prURL string) adfNode {
+	attrs := map[string]interface{}{
+		"panelType": "info",
+	}
+
+	statusParagraph := adfNode{
+		Type: "paragraph",
+		Content: []adfNode{
+			{
+				Type: "text",
+				Text: fmt.Sprintf("%s → %s", fromStatus, toStatus),
+			},
+		},
+	}
+
+	reasonParagraph := adfNode{
+		Type: "paragraph",
+		Content: []adfNode{
+			{
+				Type: "text",
+				Text: "Reason: ",
+				Marks: []map[string]interface{}{
+					{"type": "strong"},
+				},
+			},
+			{
+				Type: "text",
+				Text: fmt.Sprintf("PR #%d in %s/%s %s", prNumber, repoOwner, repoName, prStateReason),
+			},
+		},
+	}
+
+	linkParagraph := adfNode{
+		Type: "paragraph",
+		Content: []adfNode{
+			{
+				Type: "text",
+				Text: prURL,
+				Marks: []map[string]interface{}{
+					{
+						"type": "link",
+						"attrs": map[string]interface{}{
+							"href": prURL,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	footerParagraph := adfNode{
+		Type: "paragraph",
+		Content: []adfNode{
+			{
+				Type: "text",
+				Text: "Automated transition by jirasync",
+				Marks: []map[string]interface{}{
+					{"type": "em"},
+				},
+			},
+		},
+	}
+
+	return adfNode{
+		Version: 1,
+		Type:    "doc",
+		Content: []adfNode{
+			{
+				Type:  "panel",
+				Attrs: attrs,
+				Content: []adfNode{
+					{
+						Type: "paragraph",
+						Content: []adfNode{
+							{
+								Type: "text",
+								Text: "🔄 Ticket Transitioned",
+								Marks: []map[string]interface{}{
+									{"type": "strong"},
+								},
+							},
+						},
+					},
+					statusParagraph,
+					reasonParagraph,
+					linkParagraph,
+					footerParagraph,
+				},
+			},
+		},
+	}
+}
+
 // buildFieldUpdateADF creates an ADF document for field update notification
 func buildFieldUpdateADF(releaseNotes, prKind, status string) adfNode {
 	// Blue info panel for field update notification
