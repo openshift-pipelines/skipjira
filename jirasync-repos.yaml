@@ -31,8 +31,6 @@ repositories:
   - owner: tektoncd
     name: pipeline
   - owner: tektoncd
-    name: pipelines-as-code
-  - owner: tektoncd
     name: plumbing
   - owner: tektoncd
     name: pruner
