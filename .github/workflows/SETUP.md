@@ -115,15 +115,15 @@ After a run completes:
 ```
 === Collecting PRs from openshift-pipelines/skipjira ===
   Found 5 PRs updated since 2026-04-01
-  PR #123 (merged) → target status: On QA
+  PR #123 (merged) → target status: Dev Complete
     ✓ Linked to 1 ticket(s): [SRVKP-12345]
 
 === Processing Tickets (Global Batching) ===
 Found 3 unique tickets across all repositories
 
 Processing SRVKP-12345 (current: 'Code Review')
-  PR #123 state: merged → Jira target: 'On QA'
-  ✓ Transitioned SRVKP-12345: 'Code Review' → 'On QA' (PR state: merged)
+  PR #123 state: merged → Jira target: 'Dev Complete'
+  ✓ Transitioned SRVKP-12345: 'Code Review' → 'Dev Complete' (PR state: merged)
 
 Jirasync completed - 1 tickets transitioned
 ```
@@ -134,7 +134,7 @@ You should receive a message like:
 ```
 The following Jira tickets were processed for workflow transitions.
 
-SRVKP-12345 `Code Review` → `On QA` ✅ APPLIED
+SRVKP-12345 `Code Review` → `Dev Complete` ✅ APPLIED
   • openshift-pipelines/skipjira#123: Fix bug in sync logic
 
 🤖 jirasync | 1 tickets processed • 2 already in correct status • 0 unlinked PRs

@@ -8,7 +8,7 @@ import (
 )
 
 // PRStateToJiraStatus maps PR states to desired Jira status
-// Note: We never automatically close tickets - "On QA" is the furthest we go
+// Note: We never automatically close tickets - "Dev Complete" is the furthest we go
 func PRStateToJiraStatus(prState github.PRState) string {
 	switch prState {
 	case github.PRStateDraft, github.PRStateChangesRequested:
@@ -18,7 +18,7 @@ func PRStateToJiraStatus(prState github.PRState) string {
 	case github.PRStateApproved:
 		return "Code Review"
 	case github.PRStateMerged:
-		return "On QA"
+		return "Dev Complete"
 	case github.PRStateClosed:
 		// Closed without merge goes back to In Progress (work abandoned/needs redo)
 		return "In Progress"

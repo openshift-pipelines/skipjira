@@ -39,10 +39,10 @@ PR States → Jira Transitions:
   - draft/changes_requested → "In Progress"
   - ready/review_requested  → "Code Review"
   - approved                → "Code Review"
-  - merged                  → "On QA"
+  - merged                  → "Dev Complete"
   - closed (without merge)  → "In Progress"
 
-Note: Tickets are never automatically closed - "On QA" is the furthest state.
+Note: Tickets are never automatically closed - "Dev Complete" is the furthest state.
 Closing tickets should be done manually after QA verification.`,
 	RunE: runSync,
 }

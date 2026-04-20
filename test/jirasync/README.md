@@ -96,10 +96,10 @@ Tickets with PRs across multiple repos: 2
   → [tektoncd/cli] PR #2768 (merged) - Change all occurences of GCS buckets with OCI buckets
   ⚠ PRs span 2 repositories
   Using most behind state: merged (from tektoncd/results PR #1257)
-  Target Jira Status: On QA
-  Available transitions (4): Start → In Progress, Review → Code Review, QA → On QA, Close → Closed
-  ⚠ No direct transition to 'On QA'
-  → Multi-step possible: 'To Do' → 'In Progress' → 'On QA'
+  Target Jira Status: Dev Complete
+  Available transitions (4): Start → In Progress, Review → Code Review, QA → Dev Complete, Close → Closed
+  ⚠ No direct transition to 'Dev Complete'
+  → Multi-step possible: 'To Do' → 'In Progress' → 'Dev Complete'
   ✓ Would attempt multi-step transition (max 3 steps)
 
 [SRVKP-11090] Replace occurences of GCS buckets to OCI buckets i...
@@ -110,7 +110,7 @@ Tickets with PRs across multiple repos: 2
   ⚠ PRs span 2 repositories
   Using most behind state: approved (from tektoncd/plumbing PR #3223)
   Target Jira Status: Code Review
-  Available transitions (4): Start → In Progress, Review → Code Review, QA → On QA, Close → Closed
+  Available transitions (4): Start → In Progress, Review → Code Review, QA → Dev Complete, Close → Closed
   ✓ Would execute direct transition: 'To Do' → 'Code Review'
   → Using transition: 'Review' (ID: 21)
 
@@ -198,13 +198,13 @@ PROJ-123 has PRs in 3 repos:
 When direct transition isn't available:
 
 ```
-Ticket in "To Do" → Target "On QA"
+Ticket in "To Do" → Target "Dev Complete"
 No direct path available
 
 Attempting multi-step:
   Step 1: To Do → In Progress
   Step 2: In Progress → Code Review
-  Step 3: Code Review → On QA
+  Step 3: Code Review → Dev Complete
 ```
 
 ### Terminal State Protection

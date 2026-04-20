@@ -17,7 +17,7 @@
 - **Transition comments**: Optionally adds a Jira comment on each transitioned ticket explaining why it was moved
 - **Slack integration**: Optional notifications for transitioned tickets
 - **Flexible date filtering**: Process PRs from specific dates or time ranges
-- **Terminal state protection**: Never auto-closes tickets (On QA is the furthest state)
+- **Terminal state protection**: Never auto-closes tickets (Dev Complete is the furthest state)
 
 ## PR State → Jira Transition Mapping
 
@@ -26,10 +26,10 @@
 | Draft / Changes Requested | In Progress |
 | Ready / Review Requested | Code Review |
 | Approved | Code Review |
-| Merged | On QA |
+| Merged | Dev Complete |
 | Closed (without merge) | In Progress |
 
-**Note:** Tickets are never automatically closed. "On QA" is the furthest automated state. Closing tickets should be done manually after QA verification.
+**Note:** Tickets are never automatically closed. "Dev Complete" is the furthest automated state. Closing tickets should be done manually after QA verification.
 
 ## Release Notes Feature
 
@@ -278,7 +278,7 @@ Example Slack message:
 ```
 The following Jira tickets were processed for workflow transitions.
 
-SRVKP-11096 `To Do` → `On QA` ✅ APPLIED
+SRVKP-11096 `To Do` → `Dev Complete` ✅ APPLIED
   • tektoncd/results#1257: Change all occurences of GCS buckets...
   • tektoncd/cli#2768: Change all occurences of GCS buckets...
 
@@ -311,10 +311,10 @@ SRVKP-11090 `To Do` → `Code Review` ✅ APPLIED
 If a direct transition isn't available, jirasync will attempt to navigate through intermediate states automatically:
 
 ```
-Example: To Do → On QA (no direct path)
+Example: To Do → Dev Complete (no direct path)
 Step 1: To Do → In Progress
 Step 2: In Progress → Code Review
-Step 3: Code Review → On QA
+Step 3: Code Review → Dev Complete
 ```
 
 The algorithm prefers common workflow states like "In Progress" and "Code Review" as intermediate steps.
@@ -374,8 +374,8 @@ Starting jirasync for 2 repositories
 Found 4 unique tickets across all repositories
 
   ✓ Transitioned PROJ-123: 'To Do' → 'Code Review' (PR state: approved)
-  ✓ Transitioned PROJ-456: 'In Progress' → 'On QA' in 2 steps (PR state: merged)
-    Path: 'Code Review' → 'On QA'
+  ✓ Transitioned PROJ-456: 'In Progress' → 'Dev Complete' in 2 steps (PR state: merged)
+    Path: 'Code Review' → 'Dev Complete'
   ⊗ PROJ-789: Already in terminal state 'Closed' - skipping
 
 Jirasync completed - 2 tickets transitioned
