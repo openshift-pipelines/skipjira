@@ -76,7 +76,7 @@ func TryMultiStepTransition(jiraClient *jira.Client, issueKey, currentStatus, ta
 		}
 
 		// No direct path - try progressing through workflow states
-		// Common workflow progression: To Do → In Progress → Code Review → On QA → Closed
+		// Common workflow progression: To Do → In Progress → Code Review → Dev Complete → Closed
 		preferredIntermediates := []string{
 			"In Progress", // From To Do
 			"Code Review", // From In Progress
