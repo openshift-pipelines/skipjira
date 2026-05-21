@@ -466,7 +466,7 @@ func (s *Syncer) addReleaseNotes(ctx context.Context, pr *gogithub.PullRequest, 
 			fmt.Printf("         ⚠ Failed to check release notes type: %v (continuing anyway)\n", err)
 		}
 		if skipRN {
-			fmt.Printf("         ⓘ Skipping: Release Note Type is 'Release Notes not Required'\n")
+			fmt.Printf("         ⓘ Skipping: Release Note Type is '%s'\n", releaseNotesNotRequired)
 			continue
 		}
 
@@ -545,6 +545,10 @@ func (s *Syncer) addReleaseNotes(ctx context.Context, pr *gogithub.PullRequest, 
 	}
 }
 
+// releaseNotesNotRequired is the Jira "Release Note Type" dropdown value that
+// indicates no release notes are needed for a ticket.
+const releaseNotesNotRequired = "Release Notes not Required"
+
 // shouldSkipReleaseNotes checks whether a ticket's Release Note Type field
 // indicates that release notes are not required.
 func shouldSkipReleaseNotes(fields map[string]interface{}, typeFieldID string) bool {
@@ -553,7 +557,7 @@ func shouldSkipReleaseNotes(fields map[string]interface{}, typeFieldID string) b
 	}
 	if typeField, ok := fields[typeFieldID].(map[string]interface{}); ok {
 		if value, ok := typeField["value"].(string); ok {
-			return value == "Release Notes not Required"
+			return value == releaseNotesNotRequired
 		}
 	}
 	return false

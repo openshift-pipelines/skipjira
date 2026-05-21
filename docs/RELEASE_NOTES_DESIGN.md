@@ -118,7 +118,7 @@ PR Sync → Get PRs → For each PR:
   ├─ Find Jira tickets (JQL)
   ├─ If PR is merged AND Gemini configured:
   │   ├─ For each ticket:
-  │   │   ├─ Check Release Note Type → "not Required"? → Skip
+  │   │   ├─ Check Release Note Type → "Release Notes not Required"? → Skip
   │   │   ├─ Try extract → Found? → Blue panel
   │   │   └─ Not found? → AI generate → Get assignee → Orange panel + @mention
   │   └─ Add comment to Jira (ADF)

@@ -11,13 +11,13 @@ func TestShouldSkipReleaseNotes(t *testing.T) {
 	}{
 		{
 			name:        "type field not configured",
-			fields:      map[string]interface{}{"cf_10785": map[string]interface{}{"value": "Release Notes not Required"}},
+			fields:      map[string]interface{}{"cf_10785": map[string]interface{}{"value": releaseNotesNotRequired}},
 			typeFieldID: "",
 			want:        false,
 		},
 		{
 			name:        "release notes not required",
-			fields:      map[string]interface{}{"cf_10785": map[string]interface{}{"value": "Release Notes not Required"}},
+			fields:      map[string]interface{}{"cf_10785": map[string]interface{}{"value": releaseNotesNotRequired}},
 			typeFieldID: "cf_10785",
 			want:        true,
 		},
