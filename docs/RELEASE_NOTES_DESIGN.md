@@ -56,6 +56,7 @@ Automatically extracts or AI-generates release notes from merged PRs and adds th
 10. **Large diffs**: Truncates to 3000 chars (description: 2000 chars)
 11. **No Gemini key**: Only extraction works, feature disabled if no notes found
 12. **Duplicate runs**: Currently adds new comment each time (TODO: dedup)
+13. **Release Notes not Required**: Tickets with Release Note Type set to "Release Notes not Required" are skipped entirely — no comment, no field update
 
 ## Usage
 
@@ -116,9 +117,12 @@ repositories:
 PR Sync → Get PRs → For each PR:
   ├─ Find Jira tickets (JQL)
   ├─ If PR is merged AND Gemini configured:
-  │   ├─ Try extract → Found? → Blue panel
-  │   └─ Not found? → AI generate (fetch diff/commits) → Get assignee → Orange panel + @mention
-  └─ Add comment to Jira (ADF)
+  │   ├─ For each ticket:
+  │   │   ├─ Check Release Note Type → "not Required"? → Skip
+  │   │   ├─ Try extract → Found? → Blue panel
+  │   │   └─ Not found? → AI generate → Get assignee → Orange panel + @mention
+  │   └─ Add comment to Jira (ADF)
+  └─ Otherwise skip release notes
 ```
 
 ## ADF Format
