@@ -460,21 +460,35 @@ func (s *Syncer) addReleaseNotes(ctx context.Context, pr *gogithub.PullRequest, 
 	for _, issue := range issues {
 		fmt.Printf("      → Processing %s...\n", issue.Key)
 
+		// Check if release notes are not required for this ticket
+		fullIssue, skipRN, err := s.checkReleaseNotesType(issue.Key)
+		if err != nil {
+			fmt.Printf("         ⚠ Failed to check release notes type: %v (continuing anyway)\n", err)
+		}
+		if skipRN {
+			fmt.Printf("         ⓘ Skipping: Release Note Type is '%s'\n", releaseNotesNotRequired)
+			continue
+		}
+
 		if result.IsGenerated {
 			// AI-generated: Add orange warning panel with assignee mention
 			fmt.Printf("         Approach: Add AI-generated comment with assignee mention\n")
 
-			// Get assignee account ID
-			fullIssue, err := s.jiraClient.GetIssueWithFields(issue.Key, []string{"assignee"})
-			if err != nil {
-				fmt.Printf("         ⚠ Failed to get assignee: %v\n", err)
-				// Fall back to comment without mention
-				if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, ""); err != nil {
-					fmt.Printf("         ✗ Failed to add comment: %v\n", err)
-				} else {
-					fmt.Printf("         ✓ Added AI-generated comment (no assignee mention)\n")
+			// Reuse the issue fetched by checkReleaseNotesType (which already
+			// includes the assignee field), falling back to a dedicated fetch
+			// when the type-field check was not configured.
+			if fullIssue == nil {
+				fullIssue, err = s.jiraClient.GetIssueWithFields(issue.Key, []string{"assignee"})
+				if err != nil {
+					fmt.Printf("         ⚠ Failed to get assignee: %v\n", err)
+					// Fall back to comment without mention
+					if err := s.jiraClient.AddReleaseNotesComment(issue.Key, result.Notes, result.Kind, releaseNotesStatus, ""); err != nil {
+						fmt.Printf("         ✗ Failed to add comment: %v\n", err)
+					} else {
+						fmt.Printf("         ✓ Added AI-generated comment (no assignee mention)\n")
+					}
+					continue
 				}
-				continue
 			}
 
 			// Extract assignee account ID
@@ -529,6 +543,40 @@ func (s *Syncer) addReleaseNotes(ctx context.Context, pr *gogithub.PullRequest, 
 			}
 		}
 	}
+}
+
+// releaseNotesNotRequired is the Jira "Release Note Type" dropdown value that
+// indicates no release notes are needed for a ticket.
+const releaseNotesNotRequired = "Release Notes not Required"
+
+// shouldSkipReleaseNotes checks whether a ticket's Release Note Type field
+// indicates that release notes are not required.
+func shouldSkipReleaseNotes(fields map[string]interface{}, typeFieldID string) bool {
+	if typeFieldID == "" {
+		return false
+	}
+	if typeField, ok := fields[typeFieldID].(map[string]interface{}); ok {
+		if value, ok := typeField["value"].(string); ok {
+			return value == releaseNotesNotRequired
+		}
+	}
+	return false
+}
+
+// checkReleaseNotesType fetches the Release Note Type field for a ticket
+// and returns the full issue, whether to skip release notes, and any error.
+// When the type field is not configured, it returns (nil, false, nil).
+func (s *Syncer) checkReleaseNotesType(issueKey string) (*jira.Issue, bool, error) {
+	if s.jiraReleaseNotesTypeField == "" {
+		return nil, false, nil
+	}
+
+	fullIssue, err := s.jiraClient.GetIssueWithFields(issueKey, []string{s.jiraReleaseNotesTypeField, "assignee"})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to fetch release notes type: %w", err)
+	}
+
+	return fullIssue, shouldSkipReleaseNotes(fullIssue.Fields, s.jiraReleaseNotesTypeField), nil
 }
 
 // prStateReason returns a human-readable explanation for why a PR's state triggers a Jira transition
