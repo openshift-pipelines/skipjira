@@ -28,6 +28,7 @@ type Syncer struct {
 	geminiClient                *gemini.Client
 	sinceTime                   time.Time
 	transitionComment           bool
+	finalStates                 map[string]bool
 }
 
 // SyncResult contains the results of syncing a repository
@@ -48,7 +49,7 @@ type SyncSummary struct {
 }
 
 // NewSyncer creates a new syncer instance
-func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField, geminiAPIKey, geminiModel string, sinceTime time.Time, transitionComment bool) (*Syncer, error) {
+func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField, geminiAPIKey, geminiModel string, sinceTime time.Time, transitionComment bool, finalStates []string) (*Syncer, error) {
 	jiraClient, err := jira.NewClient(jiraURL, jiraEmail, jiraToken, jiraPRField, jiraReleaseNotesTextField, jiraReleaseNotesTypeField, jiraReleaseNotesStatusField)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira client: %w", err)
@@ -60,6 +61,15 @@ func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraRele
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 		}
+	}
+
+	// Build final-states lookup set; apply defaults when nothing is configured
+	fsMap := make(map[string]bool)
+	if len(finalStates) == 0 {
+		finalStates = []string{"Closed", "Done"}
+	}
+	for _, s := range finalStates {
+		fsMap[s] = true
 	}
 
 	return &Syncer{
@@ -75,6 +85,7 @@ func NewSyncer(githubToken, jiraURL, jiraEmail, jiraToken, jiraPRField, jiraRele
 		geminiClient:                geminiClient,
 		sinceTime:                   sinceTime,
 		transitionComment:           transitionComment,
+		finalStates:                 fsMap,
 	}, nil
 }
 
@@ -240,9 +251,9 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 
 		fmt.Printf("Processing %s (current: '%s')\n", issueKey, info.Status)
 
-		// Skip tickets in terminal states
-		if info.Status == "Closed" || info.Status == "Done" {
-			fmt.Printf("  ⊗ Already in terminal state '%s' - skipping\n", info.Status)
+		// Skip tickets in configured final states
+		if s.finalStates[info.Status] {
+			fmt.Printf("  ⊗ Already in final state '%s' - skipping\n", info.Status)
 			continue
 		}
 		// Find the most behind PR across all repos

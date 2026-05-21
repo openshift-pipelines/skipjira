@@ -54,6 +54,7 @@ func main() {
 	// Parse arguments
 	var repos []jirasync.Repository
 	var configuredUsers []string
+	var configuredFinalStates []string
 
 	if len(os.Args) == 1 {
 		// No args - use default
@@ -74,6 +75,7 @@ func main() {
 		}
 		repos = cfg.Repositories
 		configuredUsers = cfg.Users
+		configuredFinalStates = cfg.FinalStates
 	} else if len(os.Args) >= 3 {
 		// Single repo mode
 		repos = []jirasync.Repository{
@@ -102,6 +104,16 @@ func main() {
 	if len(allowedUsers) > 0 {
 		fmt.Printf("Filtering PRs to %d configured users\n", len(allowedUsers))
 	}
+
+	// Build final states lookup set from config (or defaults)
+	if len(configuredFinalStates) == 0 {
+		configuredFinalStates = []string{"Closed", "Done"}
+	}
+	finalStatesMap := make(map[string]bool, len(configuredFinalStates))
+	for _, s := range configuredFinalStates {
+		finalStatesMap[s] = true
+	}
+	fmt.Printf("Final states (will not transition): %v\n", configuredFinalStates)
 
 	// Step 3: Connect to Jira
 	fmt.Println("=== Step 1: Connecting to Jira ===")
@@ -259,9 +271,9 @@ func main() {
 		fmt.Printf("[%s] %s\n", issueKey, info.Summary)
 		fmt.Printf("  Current Status: %s\n", info.Status)
 
-		// Skip tickets that are already closed
-		if info.Status == "Closed" || info.Status == "Done" {
-			fmt.Printf("  ⊗ Ticket is in terminal state - skipping\n\n")
+		// Skip tickets in configured final states
+		if finalStatesMap[info.Status] {
+			fmt.Printf("  ⊗ Ticket is in final state '%s' - skipping\n\n", info.Status)
 			continue
 		}
 

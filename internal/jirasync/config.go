@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Repositories []Repository `yaml:"repositories"`
 	Users        []string     `yaml:"users"`
+	FinalStates  []string     `yaml:"final_states"`
 }
 
 // Repository represents a GitHub repository to monitor
