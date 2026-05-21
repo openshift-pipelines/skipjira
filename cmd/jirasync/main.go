@@ -27,6 +27,7 @@ var (
 	since                       string
 	slackWebhook                string
 	transitionComment           bool
+	finalStates                 []string
 )
 
 var rootCmd = &cobra.Command{
@@ -43,7 +44,10 @@ PR States → Jira Transitions:
   - closed (without merge)  → "In Progress"
 
 Note: Tickets are never automatically closed - "Dev Complete" is the furthest state.
-Closing tickets should be done manually after QA verification.`,
+Closing tickets should be done manually after QA verification.
+
+Tickets in "final states" (default: Closed, Done) are never transitioned.
+Use --final-states or the config file's final_states field to customize.`,
 	RunE: runSync,
 }
 
@@ -62,6 +66,9 @@ func init() {
 	rootCmd.Flags().StringVar(&since, "since", "", "Only process PRs updated since this date (format: 2006-01-02 or DD/MM/YYYY). Defaults to yesterday if not provided.")
 	rootCmd.Flags().StringVar(&slackWebhook, "slack-webhook", "", "Slack webhook URL for notifications (optional)")
 	rootCmd.Flags().BoolVar(&transitionComment, "transition-comment", false, "Add a Jira comment on each transitioned ticket explaining the reason (optional)")
+	rootCmd.Flags().StringSliceVar(&finalStates, "final-states", nil,
+		"Comma-separated Jira statuses that should not be transitioned (e.g., 'Closed,Done,On QA'). "+
+			"Overrides config file. Defaults to 'Closed,Done' if neither flag nor config is set.")
 
 	rootCmd.MarkFlagRequired("config")
 	rootCmd.MarkFlagRequired("github-token")
@@ -79,6 +86,18 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Loaded %d repositories from config\n", len(cfg.Repositories))
+
+	// Determine final states: CLI flag overrides config file; NewSyncer applies defaults if both empty
+	effectiveFinalStates := finalStates
+	if len(effectiveFinalStates) == 0 {
+		effectiveFinalStates = cfg.FinalStates
+	}
+
+	if len(effectiveFinalStates) > 0 {
+		fmt.Printf("Final states (will not transition): %v\n", effectiveFinalStates)
+	} else {
+		fmt.Printf("Final states (default): [Closed, Done]\n")
+	}
 
 	// Parse since date - default to yesterday if not provided
 	var sinceTime time.Time
@@ -109,6 +128,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		geminiModel,
 		sinceTime,
 		transitionComment,
+		effectiveFinalStates,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create syncer: %w", err)

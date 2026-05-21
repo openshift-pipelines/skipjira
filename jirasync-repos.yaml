@@ -52,7 +52,7 @@ users:
   - divyansh42
   - enarha
   - infernus01
-  - jayesh-garg 
+  - jayesh-garg
   - jkhelil
   - khrm
   - manthinasai
@@ -66,3 +66,11 @@ users:
   - vdemeester
   - waveywaves
   - zakisk
+
+# Final states - tickets in these states will NOT be transitioned by jirasync.
+# If omitted, defaults to: Closed, Done
+final_states:
+  - Closed
+  - Done
+  - On QA
+  - Release Pending
