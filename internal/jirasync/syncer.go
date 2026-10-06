@@ -15,9 +15,9 @@ import (
 	"github.com/openshift-pipelines/skipjira/internal/slack"
 )
 
-// skipTransitionStatuses lists Jira statuses that should never be moved by jirasync.
+// SkipTransitionStatuses lists Jira statuses that should never be moved by jirasync.
 // Tickets already in these states are left as-is; release notes still proceed normally.
-var skipTransitionStatuses = []string{
+var SkipTransitionStatuses = []string{
 	"Closed",
 	"Done",
 	"Release Pending",
@@ -261,7 +261,7 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 		fmt.Printf("Processing %s (current: '%s')\n", issueKey, info.Status)
 
 		// Skip tickets in states that should not be moved back
-		if slices.Contains(skipTransitionStatuses, info.Status) {
+		if slices.Contains(SkipTransitionStatuses, info.Status) {
 			fmt.Printf("  ⊗ Already in '%s' - skipping transition\n", info.Status)
 			continue
 		}

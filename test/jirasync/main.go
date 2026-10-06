@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -54,40 +55,54 @@ func main() {
 	// Parse arguments
 	var repos []jirasync.Repository
 	var configuredUsers []string
+	sinceStr := ""
 
-	if len(os.Args) == 1 {
-		// No args - use default
+	args := os.Args[1:]
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--config":
+			if i+1 >= len(args) {
+				fmt.Println("Usage: go run ./test/jirasync --config <config-file>")
+				os.Exit(1)
+			}
+			cfg, err := jirasync.LoadConfig(args[i+1])
+			if err != nil {
+				fmt.Printf("Error loading config: %v\n", err)
+				os.Exit(1)
+			}
+			repos = cfg.Repositories
+			configuredUsers = cfg.Users
+			i++
+		case "--since":
+			if i+1 >= len(args) {
+				fmt.Println("--since requires a date argument (e.g. 2024-01-01)")
+				os.Exit(1)
+			}
+			sinceStr = args[i+1]
+			i++
+		default:
+			if len(args)-i >= 2 && !strings.HasPrefix(args[i], "--") {
+				repos = []jirasync.Repository{{Owner: args[i], Name: args[i+1]}}
+				i++
+			}
+		}
+	}
+
+	if len(repos) == 0 {
 		repos = []jirasync.Repository{
 			{Owner: "openshift-pipelines", Name: "skipjira"},
 		}
-	} else if os.Args[1] == "--config" {
-		// Config file mode
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run ./test/jirasync --config <config-file>")
-			fmt.Println("   or: go run ./test/jirasync <owner> <repo>")
-			os.Exit(1)
-		}
-		cfg, err := jirasync.LoadConfig(os.Args[2])
-		if err != nil {
-			fmt.Printf("Error loading config: %v\n", err)
-			os.Exit(1)
-		}
-		repos = cfg.Repositories
-		configuredUsers = cfg.Users
-	} else if len(os.Args) >= 3 {
-		// Single repo mode
-		repos = []jirasync.Repository{
-			{Owner: os.Args[1], Name: os.Args[2]},
-		}
-	} else {
-		fmt.Println("Usage: go run ./test/jirasync                         # test openshift-pipelines/skipjira")
-		fmt.Println("   or: go run ./test/jirasync <owner> <repo>          # test single repo")
-		fmt.Println("   or: go run ./test/jirasync --config <config-file>  # test multiple repos")
-		os.Exit(1)
 	}
 
-	// Test with PRs from last 7 days
 	sinceTime := time.Now().AddDate(0, 0, -7)
+	if sinceStr != "" {
+		parsed, err := jirasync.ParseDate(sinceStr)
+		if err != nil {
+			fmt.Printf("Error parsing --since: %v\n", err)
+			os.Exit(1)
+		}
+		sinceTime = parsed
+	}
 
 	fmt.Printf("Testing jirasync flow for %d repository(ies)\n", len(repos))
 	fmt.Printf("Fetching PRs updated since %s\n\n", sinceTime.Format("2006-01-02"))
@@ -126,8 +141,9 @@ func main() {
 	// Global mapping: ticketKey → list of PRs from any repo
 	globalTicketPRs := make(map[string][]repoPRInfo)
 	globalTicketInfo := make(map[string]struct {
-		Status  string
-		Summary string
+		Status    string
+		Summary   string
+		IssueType string
 	})
 
 	totalPRs := 0
@@ -167,7 +183,7 @@ func main() {
 				continue
 			}
 
-			targetStatus := jirasync.PRStateToJiraStatus(state)
+			targetStatus := jirasync.PRStateToJiraStatus(state, "")
 			if targetStatus == "" {
 				continue
 			}
@@ -213,10 +229,18 @@ func main() {
 						}
 					}
 
+					issueType := ""
+					if typeField, ok := issue.Fields["issuetype"].(map[string]interface{}); ok {
+						if name, ok := typeField["name"].(string); ok {
+							issueType = name
+						}
+					}
+
 					globalTicketInfo[issue.Key] = struct {
-						Status  string
-						Summary string
-					}{Status: status, Summary: summary}
+						Status    string
+						Summary   string
+						IssueType string
+					}{Status: status, Summary: summary, IssueType: issueType}
 				}
 			}
 		}
@@ -259,9 +283,9 @@ func main() {
 		fmt.Printf("[%s] %s\n", issueKey, info.Summary)
 		fmt.Printf("  Current Status: %s\n", info.Status)
 
-		// Skip tickets that are already closed
-		if info.Status == "Closed" || info.Status == "Done" {
-			fmt.Printf("  ⊗ Ticket is in terminal state - skipping\n\n")
+		// Skip tickets in states that should not be moved back
+		if slices.Contains(jirasync.SkipTransitionStatuses, info.Status) {
+			fmt.Printf("  ⊗ Already in '%s' - skipping transition\n\n", info.Status)
 			continue
 		}
 
@@ -288,7 +312,7 @@ func main() {
 			fmt.Printf("  %s [%s] PR #%d (%s) - %s\n", marker, repoName, pr.number, pr.state, pr.title)
 		}
 
-		targetStatus := jirasync.PRStateToJiraStatus(mostBehind.state)
+		targetStatus := jirasync.PRStateToJiraStatus(mostBehind.state, info.IssueType)
 		if len(repoSet) > 1 {
 			fmt.Printf("  ⚠ PRs span %d repositories\n", len(repoSet))
 		}
